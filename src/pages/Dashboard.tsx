@@ -1,3 +1,4 @@
+import AppLogo from "@/components/AppLogo";
 import { CalorieRing } from '@/components/CalorieRing';
 import { MacroBar } from '@/components/MacroBar';
 import { MealCard } from '@/components/MealCard';
@@ -23,8 +24,20 @@ export default function Dashboard() {
     <div className="flex flex-col h-full overflow-y-auto pb-24">
       {/* Header */}
       <div className="px-5 pt-6 pb-2 safe-top">
-        <p className="text-sm text-muted-foreground font-medium">{greeting} 👋</p>
-        <h1 className="text-2xl font-bold text-foreground">Today's Summary</h1>
+        <div className="flex items-start gap-3">
+          <div className="shrink-0">
+            <AppLogo />
+          </div>
+
+          <div className="min-w-0 flex-1 pt-1">
+            <p className="text-sm text-muted-foreground font-medium">
+              {greeting} 👋
+            </p>
+            <h1 className="text-2xl font-bold text-foreground leading-tight">
+              Today&apos;s Summary
+            </h1>
+          </div>
+        </div>
       </div>
 
       {/* Calorie Ring Card */}
