@@ -1,12 +1,13 @@
-import { Home, Plus, TrendingUp, User } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+﻿import { Activity, ChartColumnBig, House, Plus, UserRound } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const tabs = [
-  { path: '/', icon: Home, label: 'Home' },
-  { path: '/add', icon: Plus, label: 'Add', isAction: true },
-  { path: '/progress', icon: TrendingUp, label: 'Progress' },
-  { path: '/profile', icon: User, label: 'Profile' },
+  { path: "/", icon: House, label: "Home" },
+  { path: "/activity", icon: Activity, label: "Activity" },
+  { path: "/add", icon: Plus, label: "Log", isAction: true },
+  { path: "/progress", icon: ChartColumnBig, label: "Progress" },
+  { path: "/profile", icon: UserRound, label: "Profile" },
 ];
 
 export function BottomNav() {
@@ -14,9 +15,9 @@ export function BottomNav() {
   const navigate = useNavigate();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-t safe-bottom">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-4">
-        {tabs.map(tab => {
+    <nav className="absolute bottom-0 left-0 right-0 z-50 border-t border-white/60 bg-background/95 backdrop-blur-xl safe-bottom">
+      <div className="mx-auto flex h-20 max-w-[430px] items-center justify-between px-4">
+        {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;
           const Icon = tab.icon;
 
@@ -25,9 +26,9 @@ export function BottomNav() {
               <button
                 key={tab.path}
                 onClick={() => navigate(tab.path)}
-                className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground shadow-lg -mt-4 active:scale-95 transition-transform"
+                className="-mt-8 flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)))] text-white shadow-[0_26px_40px_-24px_hsl(var(--primary)/0.95)] transition-transform active:scale-95"
               >
-                <Icon className="w-6 h-6" />
+                <Icon className="h-6 w-6" />
               </button>
             );
           }
@@ -37,12 +38,12 @@ export function BottomNav() {
               key={tab.path}
               onClick={() => navigate(tab.path)}
               className={cn(
-                'flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+                "flex min-w-[64px] flex-col items-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold transition-all",
+                isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{tab.label}</span>
+              <Icon className="h-5 w-5" />
+              <span>{tab.label}</span>
             </button>
           );
         })}

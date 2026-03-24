@@ -1,11 +1,12 @@
-import { MealLogItem, MealType, useApp } from '@/context/AppContext';
-import { Trash2 } from 'lucide-react';
+﻿import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { MealLogItem, MealType, MEAL_LABELS, useApp } from "@/context/AppContext";
 
-const mealConfig: Record<MealType, { label: string; icon: string }> = {
-  breakfast: { label: 'Breakfast', icon: '🌅' },
-  lunch: { label: 'Lunch', icon: '☀️' },
-  dinner: { label: 'Dinner', icon: '🌙' },
-  snack: { label: 'Snack', icon: '🍿' },
+const mealCopy: Record<MealType, { subtitle: string; accent: string }> = {
+  breakfast: { subtitle: "Start strong and keep the morning simple.", accent: "from-amber-100 via-white to-amber-50" },
+  lunch: { subtitle: "Aim for the fastest high-protein win.", accent: "from-emerald-100 via-white to-teal-50" },
+  dinner: { subtitle: "Close the day without guessing portions.", accent: "from-sky-100 via-white to-cyan-50" },
+  snack: { subtitle: "Use snacks to close nutrient gaps.", accent: "from-rose-100 via-white to-orange-50" },
 };
 
 interface MealCardProps {
@@ -14,42 +15,63 @@ interface MealCardProps {
 }
 
 export function MealCard({ mealType, items }: MealCardProps) {
+  const navigate = useNavigate();
   const { removeMealLog } = useApp();
-  const config = mealConfig[mealType];
-  const totalCals = items.reduce((sum, i) => sum + i.food.calories * i.quantity, 0);
+  const totalCalories = items.reduce((sum, item) => sum + (item.food.calories * item.quantity), 0);
+  const copy = mealCopy[mealType];
 
   return (
-    <div className="bg-card rounded-lg border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{config.icon}</span>
-          <span className="font-semibold text-foreground">{config.label}</span>
+    <section className={`rounded-[28px] border border-white/70 bg-gradient-to-br ${copy.accent} p-4 shadow-[0_24px_40px_-34px_rgba(0,0,0,0.45)]`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">{MEAL_LABELS[mealType]}</p>
+          <h3 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">{Math.round(totalCalories)} kcal logged</h3>
+          <p className="mt-1 max-w-[26ch] text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
-        <span className="text-sm font-medium text-muted-foreground">{totalCals} kcal</span>
+        <button
+          onClick={() => navigate(`/add?meal=${mealType}`)}
+          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground text-background shadow-[0_18px_30px_-24px_rgba(0,0,0,0.8)] transition-transform active:scale-95"
+          aria-label={`Add to ${MEAL_LABELS[mealType]}`}
+        >
+          <Plus className="h-5 w-5" />
+        </button>
       </div>
-      {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground italic">Nothing logged yet</p>
-      ) : (
-        <div className="space-y-2">
-          {items.map(item => (
-            <div key={item.id} className="flex items-center justify-between group">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm">{item.food.emoji}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{item.food.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.food.servingSize} · {item.food.calories} kcal</p>
-                </div>
+
+      <div className="mt-4 space-y-3">
+        {items.length === 0 ? (
+          <button
+            onClick={() => navigate(`/add?meal=${mealType}`)}
+            className="flex w-full items-center justify-between rounded-2xl border border-dashed border-primary/25 bg-white/70 px-4 py-4 text-left transition-colors hover:border-primary/40 hover:bg-white"
+          >
+            <div>
+              <p className="text-sm font-semibold text-foreground">Nothing logged yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Tap to add a quick favourite, scan a barcode, or paste a recipe.</p>
+            </div>
+            <ArrowRight className="h-4 w-4 text-primary" />
+          </button>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/82 px-4 py-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-sm font-semibold text-primary">
+                {Math.round(item.food.protein)}P
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">{item.food.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.quantity} x {item.food.servingSize}  |  {Math.round(item.food.calories * item.quantity)} kcal
+                </p>
               </div>
               <button
                 onClick={() => removeMealLog(item.id)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-destructive/10"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                aria-label={`Remove ${item.food.name}`}
               >
-                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                <Trash2 className="h-4 w-4" />
               </button>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
+          ))
+        )}
+      </div>
+    </section>
   );
 }

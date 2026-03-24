@@ -1,3 +1,4 @@
+﻿import tailwindcssAnimate from "tailwindcss-animate";
 import type { Config } from "tailwindcss";
 
 export default {
@@ -14,7 +15,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+        sans: ["Instrument Sans", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,12 +52,12 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         cal: {
-          green: "hsl(var(--calorie-green))",
-          orange: "hsl(var(--calorie-orange))",
-          red: "hsl(var(--calorie-red))",
-          blue: "hsl(var(--calorie-blue))",
-          purple: "hsl(var(--calorie-purple))",
-          pink: "hsl(var(--calorie-pink))",
+          green: "hsl(var(--chart-5))",
+          orange: "hsl(var(--chart-3))",
+          red: "hsl(var(--destructive))",
+          blue: "hsl(var(--chart-2))",
+          purple: "hsl(var(--chart-4))",
+          pink: "hsl(var(--accent))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
@@ -100,5 +101,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;
