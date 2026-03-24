@@ -1,3 +1,5 @@
+﻿import { Flame, UtensilsCrossed } from "lucide-react";
+
 export default function AppLogo() {
   return (
     <div className="inline-flex items-center">
