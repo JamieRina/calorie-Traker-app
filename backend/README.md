@@ -144,14 +144,3 @@ npm run worker:reminders
 - Reminder jobs are scheduled with their timezone and write last-attempt audit fields.
 - The sync endpoint retries failed mutations safely and reuses already-applied mutation IDs.
 
-## What Codex still cannot do end-to-end by itself
-
-See `manual_steps_codex_cant_do.md` for the manual steps around cloud accounts, provider secrets, vendor contracts, barcode/nutrition licensing, mobile push credentials, production monitoring, and deployment access.
-
-## Notes
-
-- This is a serious starter, not a finished commercial backend.
-- The AI recipe parsing module has two modes:
-  - OpenAI-backed structured parsing when `OPENAI_API_KEY` is present
-  - a fallback heuristic parser when no model key is present
-- For production launch, you would normally split this monolith into deployable services only once traffic and team size justify it.
