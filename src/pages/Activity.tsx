@@ -1,7 +1,9 @@
-﻿import { motion } from "framer-motion";
-import { Clock3, Dumbbell, Flame, Footprints, MapPinned, Plus } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Clock3, Dumbbell, Flame, MapPinned, Plus, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { WORKOUT_PRESETS, useApp } from "@/context/AppContext";
+import { AppPage, MetricCard, PageHeader, SectionCard } from "@/components/app/AppPage";
+import { createWorkoutEntry, getDashboard, listWorkouts } from "@/lib/api";
+import { useApp } from "@/context/AppContext";
 
 function formatDateLabel(dateKey: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -12,95 +14,126 @@ function formatDateLabel(dateKey: string) {
 }
 
 export default function Activity() {
-  const { addWorkout, currentDate, dailyGoal, getDailyActivity, routeLibrary } = useApp();
-  const activity = getDailyActivity();
-  const stepProgress = Math.min((activity.steps / dailyGoal.steps) * 100, 100);
+  const { currentDate, uiMode, routeLibrary, workoutPresets, isBackendReady, backendError, retryBackendConnection } = useApp();
+  const queryClient = useQueryClient();
+
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard", currentDate],
+    queryFn: () => getDashboard(currentDate),
+    enabled: isBackendReady,
+  });
+
+  const workoutsQuery = useQuery({
+    queryKey: ["workouts"],
+    queryFn: listWorkouts,
+    enabled: isBackendReady,
+  });
+
+  const workoutMutation = useMutation({
+    mutationFn: (preset: (typeof workoutPresets)[number]) =>
+      createWorkoutEntry({
+        title: preset.type,
+        caloriesBurned: preset.caloriesBurned,
+        durationMinutes: preset.durationMinutes,
+        performedAt: new Date(`${currentDate}T12:00:00`).toISOString(),
+      }),
+    onSuccess: (workout) => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard", currentDate] });
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      toast.success(`${workout.title} added.`);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not log that workout.");
+    },
+  });
+
+  const dashboard = dashboardQuery.data;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto pb-28">
-      <div className="px-5 pt-6 safe-top">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Movement sync</p>
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div>
-            <h1 className="display-font text-[2rem] font-bold leading-none tracking-tight text-foreground">Activity and burn</h1>
-            <p className="mt-2 text-sm text-muted-foreground">{formatDateLabel(currentDate)}  |  movement feeds the live calorie balance.</p>
-          </div>
-          <div className="rounded-full bg-white/72 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">Health sync live</div>
-        </div>
-      </div>
+    <AppPage>
+      <PageHeader
+        eyebrow="Activity"
+        title="Movement without the clutter"
+        description={`For ${formatDateLabel(currentDate)}, this screen keeps the focus on workouts you actually logged.`}
+        action={
+          <span className="rounded-full border border-white/80 bg-white/92 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
+            {uiMode === "advanced" ? "Advanced" : "Simple"}
+          </span>
+        }
+      />
 
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mx-5 mt-5 rounded-[30px] bg-[linear-gradient(150deg,hsl(var(--foreground)),hsl(var(--primary))_58%,hsl(var(--accent)))] p-5 text-white shadow-[0_34px_58px_-34px_rgba(10,47,43,0.75)]"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">Today</p>
-            <h2 className="display-font mt-2 text-3xl font-bold tracking-tight">{activity.steps.toLocaleString()} steps</h2>
-            <p className="mt-2 text-sm text-white/80">
-              {activity.distanceKm.toFixed(1)} km walked and {activity.activeMinutes} active minutes logged.
-            </p>
+      {!isBackendReady ? (
+        <SectionCard
+          eyebrow="Backend"
+          title="Workout sync needs the backend"
+          description={backendError ?? "The app could not reach the backend yet."}
+          action={
+            <button
+              onClick={retryBackendConnection}
+              className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </button>
+          }
+        >
+          <div className="rounded-[22px] bg-secondary/35 px-4 py-4 text-sm text-muted-foreground">
+            Start the backend and this page will switch to live workout data.
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-right backdrop-blur-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">Route</p>
-            <p className="mt-1 text-sm font-semibold text-white">{activity.routeName ?? "Freestyle walk"}</p>
-          </div>
-        </div>
+        </SectionCard>
+      ) : null}
 
-        <div className="mt-5 rounded-[24px] border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-semibold text-white/82">Step goal progress</span>
-            <span className="font-semibold text-white">{Math.round(stepProgress)}%</span>
-          </div>
-          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white/18">
-            <div className="h-full rounded-full bg-white" style={{ width: `${stepProgress}%` }} />
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/76">
-            <span className="rounded-full bg-white/10 px-3 py-1.5">Goal {dailyGoal.steps.toLocaleString()} steps</span>
-            <span className="rounded-full bg-white/10 px-3 py-1.5">Burn {Math.round(activity.stepBurn)} kcal</span>
-          </div>
-        </div>
-      </motion.section>
-
-      <section className="mt-4 grid gap-3 px-5 sm:grid-cols-3">
-        {[
-          { icon: Footprints, label: "Step burn", value: `${Math.round(activity.stepBurn)} kcal`, detail: `${activity.distanceKm.toFixed(1)} km` },
-          { icon: Dumbbell, label: "Workout burn", value: `${Math.round(activity.workoutBurn)} kcal`, detail: `${activity.workouts.length} sessions today` },
-          { icon: Flame, label: "Total burn", value: `${Math.round(activity.totalBurn)} kcal`, detail: `${Math.round(activity.netCalories)} kcal net` },
-        ].map((card, index) => (
-          <motion.article
-            key={card.label}
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 + (index * 0.04) }}
-            className="rounded-[26px] border border-white/70 bg-card/84 p-4 shadow-[0_20px_34px_-32px_rgba(0,0,0,0.45)] backdrop-blur-sm"
+      {dashboard ? (
+        <>
+          <SectionCard
+            variant="hero"
+            eyebrow="Today"
+            title={`${Math.round(dashboard.caloriesBurned)} kcal burned`}
+            description={`${dashboard.workoutCount} workouts logged so far.`}
+            action={
+              <div className="rounded-2xl border border-white/15 bg-white/12 px-3 py-2 text-right backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Net</p>
+                <p className="mt-1 text-sm font-semibold text-white">{Math.round(dashboard.netCalories)} kcal</p>
+              </div>
+            }
           >
-            <card.icon className="h-5 w-5 text-primary" />
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/55">{card.label}</p>
-            <p className="display-font mt-2 text-2xl font-bold tracking-tight text-foreground">{card.value}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{card.detail}</p>
-          </motion.article>
-        ))}
-      </section>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Workouts</p>
+                <p className="display-font mt-2 text-2xl font-bold text-white">{dashboard.workoutCount}</p>
+              </div>
+              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Food logged</p>
+                <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.daily.calories)} kcal</p>
+              </div>
+              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Burned</p>
+                <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.caloriesBurned)} kcal</p>
+              </div>
+            </div>
+          </SectionCard>
 
-      <section className="mx-5 mt-5 rounded-[28px] border border-white/70 bg-card/84 p-4 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Workout presets</p>
-            <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">Log a session without friction</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MetricCard icon={Flame} label="Today burn" value={`${Math.round(dashboard.caloriesBurned)} kcal`} detail={`${dashboard.workoutCount} workouts`} />
+            <MetricCard icon={Dumbbell} label="Latest intake" value={`${Math.round(dashboard.daily.calories)} kcal`} detail={`${dashboard.mealCount} meals logged`} />
+            <MetricCard icon={Clock3} label="Recent sessions" value={`${dashboard.workouts.length}`} detail="Counted in today's total" tone="accent" />
           </div>
-          <div className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">{WORKOUT_PRESETS.length} options</div>
-        </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {WORKOUT_PRESETS.map((preset) => (
+        </>
+      ) : null}
+
+      <SectionCard eyebrow="Quick Log" title="Fast preset workouts" description="One tap is enough for the sessions you repeat most often.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {workoutPresets.map((preset) => (
             <button
               key={preset.type}
               onClick={() => {
-                addWorkout(preset);
-                toast.success(`${preset.type} added to today.`);
+                if (!isBackendReady) {
+                  toast.error("Start the backend before logging workouts.");
+                  return;
+                }
+                workoutMutation.mutate(preset);
               }}
-              className="rounded-[24px] border border-white/70 bg-white/82 p-4 text-left shadow-[0_18px_30px_-30px_rgba(0,0,0,0.4)] transition-transform hover:-translate-y-0.5"
+              className="rounded-[24px] border border-white/80 bg-white/88 p-4 text-left transition-transform hover:-translate-y-0.5"
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-foreground">{preset.type}</span>
@@ -116,67 +149,56 @@ export default function Activity() {
             </button>
           ))}
         </div>
-      </section>
+      </SectionCard>
 
-      <section className="mx-5 mt-5 rounded-[28px] border border-white/70 bg-card/84 p-4 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Today&apos;s sessions</p>
-            <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">Movement already counted</h2>
-          </div>
-          <div className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">{activity.workouts.length} logged</div>
-        </div>
-        <div className="mt-4 space-y-3">
-          {activity.workouts.map((workout) => (
-            <div key={workout.id} className="flex items-center gap-3 rounded-[24px] border border-white/70 bg-white/82 px-4 py-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary text-primary">
-                <Clock3 className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{workout.type}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{workout.durationMinutes} min  |  {workout.intensity} intensity</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-foreground">{workout.caloriesBurned} kcal</p>
-                <p className="mt-1 text-xs text-muted-foreground">burned</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="px-5 py-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Route ideas</p>
-            <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">Keep walking frictionless</h2>
-          </div>
-          <MapPinned className="h-5 w-5 text-primary" />
-        </div>
+      <SectionCard eyebrow="Logged" title="Your recent workouts" description="Only the items that have actually been saved to the backend show up here.">
         <div className="space-y-3">
-          {routeLibrary.map((route, index) => (
-            <motion.article
-              key={route.id}
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + (index * 0.04) }}
-              className="rounded-[26px] border border-white/70 bg-card/84 p-4 shadow-[0_22px_38px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/55">{route.location}</p>
-                  <h3 className="display-font mt-1 text-lg font-bold tracking-tight text-foreground">{route.name}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">{route.terrain}</p>
+          {(workoutsQuery.data ?? []).length === 0 ? (
+            <div className="rounded-[22px] border border-dashed border-primary/20 bg-secondary/30 px-4 py-5 text-sm text-muted-foreground">
+              Log a preset above and it will appear here.
+            </div>
+          ) : (
+            (workoutsQuery.data ?? []).slice(0, 8).map((workout) => (
+              <div key={workout.id} className="flex items-center gap-3 rounded-[22px] border border-white/80 bg-secondary/25 px-4 py-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                  <Clock3 className="h-4 w-4" />
                 </div>
-                <div className="rounded-2xl bg-secondary px-3 py-2 text-right text-sm font-semibold text-foreground">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">{workout.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {workout.durationMinutes} min / {Math.round(workout.caloriesBurned)} kcal
+                  </p>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">
+                  {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(workout.performedAt))}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </SectionCard>
+
+      {uiMode === "advanced" ? (
+        <SectionCard eyebrow="Advanced" title="Walking ideas" description="Optional extras stay hidden until you choose advanced mode.">
+          <div className="space-y-3">
+            {routeLibrary.map((route) => (
+              <article key={route.id} className="flex items-start gap-3 rounded-[24px] border border-white/80 bg-secondary/25 p-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+                  <MapPinned className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">{route.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{route.location}</p>
+                </div>
+                <div className="rounded-2xl bg-white px-3 py-2 text-right text-sm font-semibold text-foreground shadow-sm">
                   <p>{route.distanceKm.toFixed(1)} km</p>
                   <p className="mt-1 text-xs text-muted-foreground">{route.estimatedBurn} kcal</p>
                 </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
-      </section>
-    </div>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
+    </AppPage>
   );
 }

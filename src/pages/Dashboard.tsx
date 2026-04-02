@@ -1,11 +1,13 @@
-﻿import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Dumbbell, Flame, Footprints, Sparkles, Target, Zap } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight, Flame, RefreshCw, Sparkles, Zap } from "lucide-react";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
+import { AppPage, MetricCard, SectionCard } from "@/components/app/AppPage";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { MealCard } from "@/components/MealCard";
-import { MealType, shiftDateKey, useApp } from "@/context/AppContext";
+import { deleteMealLog, getDashboard } from "@/lib/api";
+import { MEAL_LABELS, MealType, shiftDateKey, useApp } from "@/context/AppContext";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -13,7 +15,7 @@ function formatDateLabel(dateKey: string) {
   return new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
     day: "numeric",
-    month: "long",
+    month: "short",
   }).format(new Date(`${dateKey}T12:00:00`));
 }
 
@@ -25,220 +27,205 @@ function getTodayKey() {
   return `${year}-${month}-${day}`;
 }
 
+function DashboardFallback({ onRetry, message }: { onRetry: () => void; message: string }) {
+  return (
+    <SectionCard
+      eyebrow="Backend"
+      title="Backend not ready"
+      description={message}
+      action={
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Retry
+        </button>
+      }
+    >
+      <div className="rounded-[22px] bg-secondary/35 px-4 py-4 text-sm text-muted-foreground">
+        Start the backend with <span className="font-semibold text-foreground">npm run backend:dev</span>, then refresh this screen.
+      </div>
+    </SectionCard>
+  );
+}
+
 export default function Dashboard() {
-  const {
-    addMealLog,
-    currentDate,
-    dailyGoal,
-    getDailyActivity,
-    getDailyTotals,
-    getMealsByType,
-    getNutrientGaps,
-    getSmartSuggestions,
-    getStreakInfo,
-    setCurrentDate,
-  } = useApp();
+  const { currentDate, setCurrentDate, uiMode, isBackendReady, isBootstrapping, backendError, retryBackendConnection } = useApp();
+  const queryClient = useQueryClient();
 
-  const totals = getDailyTotals();
-  const activity = getDailyActivity();
-  const streak = getStreakInfo();
-  const gaps = getNutrientGaps().filter((gap) => gap.remaining > 0);
-  const suggestions = getSmartSuggestions();
+  const dashboardQuery = useQuery({
+    queryKey: ["dashboard", currentDate],
+    queryFn: () => getDashboard(currentDate),
+    enabled: isBackendReady,
+  });
   const todayKey = getTodayKey();
-  const isToday = currentDate === todayKey;
-  const highlightGaps = gaps.slice(0, 2);
-  const gapCopy = highlightGaps.length
-    ? `You are still short on ${highlightGaps.map((gap) => `${Math.round(gap.remaining)}${gap.unit} ${gap.label.toLowerCase()}`).join(" and ")}.`
-    : "You have covered your main nutrition targets. Use dinner or a snack to keep the streak rolling.";
 
-  const statCards = [
-    {
-      icon: Footprints,
-      label: "Steps",
-      value: activity.steps.toLocaleString(),
-      detail: `${Math.round((activity.steps / dailyGoal.steps) * 100)}% of goal`,
+  const deleteMutation = useMutation({
+    mutationFn: deleteMealLog,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard", currentDate] });
+      queryClient.invalidateQueries({ queryKey: ["recent-foods"] });
+      toast.success("Meal removed.");
     },
-    {
-      icon: Dumbbell,
-      label: "Burned",
-      value: `${Math.round(activity.totalBurn)} kcal`,
-      detail: `${Math.round(activity.workoutBurn)} workout + ${Math.round(activity.stepBurn)} walk`,
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not remove meal.");
     },
+  });
+
+  const dashboard = dashboardQuery.data;
+  const calorieGoal = dashboard?.goal?.calories ?? 2200;
+  const proteinGoal = dashboard?.goal?.protein ?? 150;
+  const carbsGoal = dashboard?.goal?.carbs ?? 220;
+  const fatGoal = dashboard?.goal?.fat ?? 70;
+  const remainingCalories = Math.max(Math.round(dashboard?.remainingCalories ?? calorieGoal), 0);
+  const groupedMeals = mealTypes.reduce<Record<MealType, typeof dashboard.meals>>(
+    (acc, mealType) => ({
+      ...acc,
+      [mealType]: dashboard?.meals.filter((meal) => meal.mealType === mealType) ?? [],
+    }),
     {
-      icon: Target,
-      label: "Net",
-      value: `${Math.round(activity.netCalories)} kcal`,
-      detail: activity.netCalories <= dailyGoal.calories ? "In target range" : "Running above plan",
+      breakfast: [],
+      lunch: [],
+      dinner: [],
+      snack: [],
     },
-  ];
+  );
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto pb-28">
-      <div className="px-5 pt-6 safe-top">
-        <div className="flex items-start justify-between gap-4">
-          <AppLogo />
-          <div className="rounded-full border border-primary/15 bg-white/70 px-3 py-1.5 text-right shadow-sm backdrop-blur-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Streak</p>
-            <p className="display-font text-lg font-bold text-foreground">{streak.count} days</p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex items-center justify-between rounded-2xl border border-white/70 bg-white/72 px-3 py-2 shadow-[0_18px_32px_-28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-          <button
-            onClick={() => setCurrentDate(shiftDateKey(currentDate, -1))}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-secondary"
-            aria-label="View previous day"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="text-center">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/55">
-              {isToday ? "Today" : "History view"}
-            </p>
-            <p className="display-font text-base font-bold tracking-tight text-foreground">{formatDateLabel(currentDate)}</p>
-          </div>
-          <button
-            onClick={() => setCurrentDate(shiftDateKey(currentDate, 1))}
-            disabled={isToday}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-35"
-            aria-label="View next day"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+    <AppPage>
+      <div className="flex items-start justify-between gap-4">
+        <AppLogo />
+        <span className="rounded-full border border-white/80 bg-white/92 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
+          {uiMode === "advanced" ? "Advanced" : "Simple"}
+        </span>
       </div>
 
-      <motion.section
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mx-5 mt-5 rounded-[30px] bg-[linear-gradient(145deg,hsl(var(--primary)),hsl(var(--primary)/0.88)_45%,hsl(var(--accent)/0.95))] p-5 text-white shadow-[0_34px_60px_-32px_hsl(var(--primary)/0.75)]"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="max-w-[17rem]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/70">Live calorie balance</p>
-            <h1 className="display-font mt-2 text-[2rem] font-bold leading-none tracking-tight">Fast logging, clear net calories.</h1>
-            <p className="mt-3 text-sm leading-6 text-white/78">
-              Logged {Math.round(totals.calories)} kcal so far and burned {Math.round(activity.totalBurn)} kcal from movement today.
-            </p>
-          </div>
-          <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-right backdrop-blur-sm">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">Forgiveness</p>
-            <p className="text-sm font-semibold text-white">
-              {streak.forgivenessRemaining > 0 ? "1 skip left" : "Used this week"}
-            </p>
-          </div>
+      <div className="flex items-center justify-between rounded-[24px] border border-white/85 bg-white/92 px-3 py-3 shadow-[0_16px_30px_-24px_rgba(29,38,48,0.16)]">
+        <button
+          onClick={() => setCurrentDate(shiftDateKey(currentDate, -1))}
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors hover:bg-secondary/70"
+          aria-label="View previous day"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <div className="text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Day view</p>
+          <p className="display-font mt-1 text-lg font-bold tracking-tight text-foreground">{formatDateLabel(currentDate)}</p>
         </div>
+        <button
+          onClick={() => setCurrentDate(shiftDateKey(currentDate, 1))}
+          disabled={currentDate === todayKey}
+          className="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors hover:bg-secondary/70 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="View next day"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_180px] md:items-center">
-          <div className="grid gap-3 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3">
-            {statCards.map((card) => (
-              <div key={card.label} className="rounded-2xl border border-white/12 bg-white/10 p-3 backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-white/85">
-                  <card.icon className="h-4 w-4" />
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.22em]">{card.label}</span>
-                </div>
-                <p className="display-font mt-3 text-xl font-bold tracking-tight text-white">{card.value}</p>
-                <p className="mt-1 text-xs text-white/72">{card.detail}</p>
-              </div>
+      {!isBackendReady && !isBootstrapping ? <DashboardFallback onRetry={retryBackendConnection} message={backendError ?? "Connection failed."} /> : null}
+
+      {isBootstrapping || dashboardQuery.isLoading ? (
+        <SectionCard eyebrow="Today" title="Loading your day" description="Pulling meals, calories, and workouts from the backend.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 2 }, (_, index) => (
+              <div key={index} className="h-28 animate-pulse rounded-[24px] bg-secondary/60" />
             ))}
           </div>
-          <div className="justify-self-center rounded-[28px] bg-white/94 p-4 text-foreground shadow-[0_30px_50px_-28px_rgba(0,0,0,0.45)]">
-            <CalorieRing consumed={totals.calories} goal={activity.adjustedBudget} size={164} />
-          </div>
-        </div>
-      </motion.section>
+        </SectionCard>
+      ) : null}
 
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mx-5 mt-4 rounded-[28px] border border-white/70 bg-card/84 p-4 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Macros</p>
-            <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">Keep dinner focused</h2>
-          </div>
-          <div className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-            Budget {Math.round(activity.adjustedBudget)} kcal
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3">
-          <MacroBar label="Protein" current={totals.protein} goal={dailyGoal.protein} color="hsl(var(--primary))" />
-          <MacroBar label="Carbs" current={totals.carbs} goal={dailyGoal.carbs} color="hsl(var(--accent))" />
-          <MacroBar label="Fat" current={totals.fat} goal={dailyGoal.fat} color="hsl(var(--chart-2))" />
-        </div>
-      </motion.section>
+      {dashboardQuery.isError ? (
+        <DashboardFallback
+          onRetry={() => {
+            retryBackendConnection();
+            dashboardQuery.refetch();
+          }}
+          message={dashboardQuery.error instanceof Error ? dashboardQuery.error.message : "Could not load your dashboard."}
+        />
+      ) : null}
 
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="mx-5 mt-4 rounded-[28px] border border-white/70 bg-card/84 p-4 shadow-[0_22px_40px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Nutrient gap insight</p>
-            <p className="mt-2 text-sm leading-6 text-foreground">{gapCopy}</p>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {gaps.slice(0, 3).map((gap) => (
-            <span key={gap.key} className="rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground">
-              {gap.label}: {Math.round(gap.remaining)}{gap.unit} left
-            </span>
-          ))}
-        </div>
-      </motion.section>
-
-      <section className="mt-4 px-5">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Smart suggestions</p>
-            <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">Close the biggest gaps in one tap</h2>
-          </div>
-          <div className="flex items-center gap-1 rounded-full bg-white/72 px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm">
-            <Zap className="h-3.5 w-3.5 text-accent" />
-            Quick add
-          </div>
-        </div>
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          {suggestions.map((food, index) => (
-            <motion.article
-              key={food.id}
-              initial={{ opacity: 0, x: 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.05 + (index * 0.04) }}
-              className="min-w-[220px] flex-1 rounded-[26px] border border-white/70 bg-card/86 p-4 shadow-[0_22px_38px_-34px_rgba(0,0,0,0.45)] backdrop-blur-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary/55">{food.source}</p>
-                  <h3 className="display-font mt-2 text-lg font-bold tracking-tight text-foreground">{food.name}</h3>
+      {dashboard ? (
+        <>
+          <SectionCard
+            variant="hero"
+            eyebrow="Today"
+            title={`${remainingCalories} kcal left`}
+            description={`${Math.round(dashboard.daily.calories)} eaten / ${calorieGoal} goal`}
+            action={
+              <div className="rounded-2xl border border-white/15 bg-white/12 px-3 py-2 text-right backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Burned</p>
+                <p className="mt-1 text-sm font-semibold text-white">{Math.round(dashboard.caloriesBurned)} kcal</p>
+              </div>
+            }
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/84">{dashboard.mealCount} meals</span>
+                  <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/84">{dashboard.workoutCount} workouts</span>
                 </div>
-                <button
-                  onClick={() => {
-                    addMealLog({ food, quantity: 1, mealType: food.mealHints[0] });
-                    toast.success(`${food.name} added to ${food.mealHints[0]}.`);
-                  }}
-                  className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_18px_30px_-24px_hsl(var(--primary)/0.8)] transition-transform active:scale-95"
-                  aria-label={`Quick add ${food.name}`}
-                >
-                  <Flame className="h-4 w-4" />
-                </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Logged</p>
+                    <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.daily.calories)} kcal</p>
+                  </div>
+                  <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Net</p>
+                    <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.netCalories)} kcal</p>
+                  </div>
+                </div>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{food.servingSize}</p>
-              <div className="mt-4 flex items-center justify-between rounded-2xl bg-secondary/75 px-3 py-2 text-sm font-medium text-foreground">
-                <span>{Math.round(food.calories)} kcal</span>
-                <span>{Math.round(food.protein)}g protein</span>
+              <div className="mx-auto rounded-[30px] bg-white/95 p-4 shadow-[0_24px_44px_-26px_rgba(0,0,0,0.4)] sm:mx-0">
+                <CalorieRing consumed={dashboard.daily.calories} goal={calorieGoal} size={168} />
               </div>
-            </motion.article>
-          ))}
-        </div>
-      </section>
+            </div>
+          </SectionCard>
 
-      <section className="mt-5 space-y-4 px-5">
-        {mealTypes.map((mealType, index) => (
-          <motion.div key={mealType} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + (index * 0.04) }}>
-            <MealCard mealType={mealType} items={getMealsByType(mealType)} />
-          </motion.div>
-        ))}
-      </section>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <MetricCard icon={Flame} label="Consumed" value={`${Math.round(dashboard.daily.calories)} kcal`} detail={`${dashboard.mealCount} meals logged`} />
+            <MetricCard icon={Zap} label="Protein" value={`${Math.round(dashboard.daily.protein)}g`} detail={`Goal ${proteinGoal}g`} />
+            <MetricCard icon={Sparkles} label="Burned" value={`${Math.round(dashboard.caloriesBurned)} kcal`} detail={`${dashboard.workoutCount} workouts today`} tone="accent" />
+          </div>
 
-      <div className="h-8" />
-    </div>
+          {uiMode === "advanced" ? (
+            <SectionCard eyebrow="Advanced" title="Macro overview" description="Extra detail stays here so the default home screen stays light.">
+              <div className="grid gap-3">
+                <MacroBar label="Protein" current={dashboard.daily.protein} goal={proteinGoal} color="hsl(var(--primary))" />
+                <MacroBar label="Carbs" current={dashboard.daily.carbs} goal={carbsGoal} color="hsl(var(--accent))" />
+                <MacroBar label="Fat" current={dashboard.daily.fat} goal={fatGoal} color="hsl(var(--chart-2))" />
+              </div>
+              <div className="mt-4 grid grid-cols-7 gap-2">
+                {dashboard.weeklyTrend.map((point) => (
+                  <div key={point.day} className="rounded-[18px] bg-secondary/40 px-2 py-3 text-center">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{point.label}</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{Math.round(point.calories)}</p>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          ) : null}
+
+          <div className="space-y-3">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Meals</p>
+                <h2 className="display-font mt-1 text-2xl font-bold tracking-tight text-foreground">Today&apos;s log</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">Keep it quick.</p>
+            </div>
+            {mealTypes.map((mealType) => (
+              <MealCard
+                key={mealType}
+                mealType={mealType}
+                entries={groupedMeals[mealType]}
+                onDelete={(mealId) => deleteMutation.mutate(mealId)}
+                isMutating={deleteMutation.isPending}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </AppPage>
   );
 }
