@@ -74,6 +74,19 @@ export default function AddMeal() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    const nextSearch = deferredSearch.trim();
+
+    if (nextSearch.length >= SEARCH_MIN_LENGTH) {
+      setSubmittedSearch((current) => (current === nextSearch ? current : nextSearch));
+      return;
+    }
+
+    if (!nextSearch) {
+      setSubmittedSearch("");
+    }
+  }, [deferredSearch]);
+
   const recentFoodsQuery = useQuery({
     queryKey: ["recent-foods"],
     queryFn: listRecentFoods,
@@ -172,7 +185,8 @@ export default function AddMeal() {
     });
   }, [deferredSearch, favouriteFoods, recentFoods, starterFoods, tab]);
 
-  const results = submittedSearch.trim().length >= SEARCH_MIN_LENGTH ? liveFoods : browsingFoods;
+  const liveSearchActive = deferredSearch.trim().length >= SEARCH_MIN_LENGTH;
+  const results = liveSearchActive ? liveFoods : browsingFoods;
   const favouriteKeys = new Set(favouriteFoods.map(foodMatchKey));
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -257,6 +271,12 @@ export default function AddMeal() {
             </button>
           </div>
 
+          <p className="text-xs text-muted-foreground">
+            {search.trim().length >= SEARCH_MIN_LENGTH
+              ? "Searching your saved foods and the live food database."
+              : `Type ${SEARCH_MIN_LENGTH} or more characters for live food search.`}
+          </p>
+
           <div className="grid grid-cols-3 gap-2">
             {tabs.map((item) => (
               <button
@@ -297,13 +317,19 @@ export default function AddMeal() {
             ? "Searching..."
             : results.length === 0
               ? "No foods found"
-              : submittedSearch.trim().length >= SEARCH_MIN_LENGTH
+              : liveSearchActive
                 ? `${results.length} live matches`
                 : `${results.length} quick picks`
         }
-        description={submittedSearch.trim().length >= SEARCH_MIN_LENGTH ? "Live results from your backend and open food data." : "Start with foods you use most often."}
+        description={liveSearchActive ? "Live results from your backend and open food data." : "Start with foods you use most often."}
       >
         <div className="space-y-3">
+          {searchQuery.isError ? (
+            <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+              {searchQuery.error instanceof Error ? searchQuery.error.message : "Food search is unavailable right now."}
+            </div>
+          ) : null}
+
           {results.length === 0 && !searchQuery.isFetching ? (
             <div className="rounded-[22px] border border-dashed border-primary/20 bg-secondary/25 px-4 py-5 text-sm text-muted-foreground">
               Try a broader search, or switch back to recent foods.

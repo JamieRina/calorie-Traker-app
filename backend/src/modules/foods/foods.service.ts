@@ -7,6 +7,12 @@ import { ApiError } from "../../lib/api-error";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
 import { logger } from "../../config/logger";
+import {
+  type BrandedFoodRecord,
+  type FavouriteListRecord,
+  type FavouriteRecord,
+  type FoodRecord
+} from "../../lib/service-contracts";
 
 type LocalFoodRecord = Prisma.FoodGetPayload<{
   include: {
@@ -222,12 +228,12 @@ export class FoodsService {
   }
 
   async barcodeLookup(barcode: string) {
-    return withLocalFallback(
+    return withLocalFallback<BrandedFoodRecord>(
       "foods.barcodeLookup",
       async () => {
         const existing = await prisma.brandedFood.findUnique({
           where: { barcode },
-          include: { nutritionFact: true, food: true }
+          include: { nutritionFact: true, food: { include: { nutritionFact: true } } }
         });
 
         if (existing) {
@@ -278,7 +284,7 @@ export class FoodsService {
           },
           include: {
             nutritionFact: true,
-            food: true
+            food: { include: { nutritionFact: true } }
           }
         });
       },
@@ -289,7 +295,7 @@ export class FoodsService {
           return {
             ...existing,
             food
-          } as any;
+          };
         }
 
         const response = await fetch(`${env.OPEN_FOOD_FACTS_BASE_URL}/api/v2/product/${barcode}.json`, {
@@ -315,13 +321,13 @@ export class FoodsService {
           fatGrams: Number(product.nutriments?.fat_100g ?? 0),
           fibreGrams: Number(product.nutriments?.fiber_100g ?? 0),
           source: "open_food_facts"
-        }) as any;
+        });
       }
     );
   }
 
   async importFood(input: ImportedFoodInput) {
-    return withLocalFallback(
+    return withLocalFallback<FoodRecord>(
       "foods.importFood",
       async () => {
         if (input.barcode) {
@@ -369,12 +375,12 @@ export class FoodsService {
           }
         });
       },
-      async () => localBackend.importFood(input) as any
+      async () => localBackend.importFood(input)
     );
   }
 
   async addFavourite(userId: string, foodId?: string, recipeId?: string) {
-    return withLocalFallback(
+    return withLocalFallback<FavouriteRecord>(
       "foods.addFavourite",
       async () => {
         if ((!foodId && !recipeId) || (foodId && recipeId)) {
@@ -419,7 +425,7 @@ export class FoodsService {
           }
         });
       },
-      async () => localBackend.addFavourite(userId, foodId, recipeId) as any
+      async () => localBackend.addFavourite(userId, foodId, recipeId)
     );
   }
 
@@ -444,12 +450,12 @@ export class FoodsService {
           removed: result.count > 0
         };
       },
-      async () => localBackend.removeFavourite(userId, foodId, recipeId) as any
+      async () => localBackend.removeFavourite(userId, foodId, recipeId)
     );
   }
 
   async listFavourites(userId: string) {
-    return withLocalFallback(
+    return withLocalFallback<FavouriteListRecord[]>(
       "foods.listFavourites",
       async () =>
         prisma.favourite.findMany({
@@ -466,12 +472,12 @@ export class FoodsService {
             createdAt: "desc"
           }
         }),
-      async () => localBackend.listFavourites(userId) as any
+      async () => localBackend.listFavourites(userId)
     );
   }
 
   async listRecentFoods(userId: string) {
-    return withLocalFallback(
+    return withLocalFallback<FoodRecord[]>(
       "foods.listRecentFoods",
       async () => {
         const recentItems = await prisma.mealLogItem.findMany({
@@ -502,7 +508,7 @@ export class FoodsService {
           })
           .slice(0, 10);
       },
-      async () => localBackend.listRecentFoods(userId) as any
+      async () => localBackend.listRecentFoods(userId)
     );
   }
 
