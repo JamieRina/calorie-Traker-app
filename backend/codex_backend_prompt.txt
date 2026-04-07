@@ -1,0 +1,126 @@
+You are Codex acting as a principal backend engineer.
+
+Generate and maintain the backend only for a production-minded calorie tracker app. The frontend is Flutter, but you are not building the frontend in this task. Build a Node.js + Express + TypeScript backend with PostgreSQL and Redis.
+
+Non-negotiable product requirements:
+- secure account creation and authentication
+- personal profile and dietary preferences
+- calorie goal calculation
+- daily meal logging
+- automatic calorie and macro rollups
+- food search and barcode lookup
+- favourites and recent foods
+- custom foods and recipes
+- AI-powered recipe parsing and nutrition estimation
+- progress tracking
+- reminders and notifications
+- weekly and monthly analytics
+- influencer/community content feed
+- offline-first support via sync queue endpoint
+- scalable, maintainable, production-style architecture
+
+Tech constraints:
+- Node.js
+- Express
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- Redis
+- BullMQ for background jobs
+- Zod validation
+- JWT auth with refresh tokens
+- REST API
+- British English in docs and comments
+
+Architecture requirements:
+- modular feature folders
+- routes, controllers, services, validators, repositories where useful
+- central error handling
+- request validation middleware
+- auth middleware
+- structured logging
+- rate limiting
+- health endpoint
+- environment config layer
+- Redis cache helpers
+- background worker for reminders
+- Prisma schema with indexes and realistic relations
+
+Data model must include:
+- users
+- user_profiles
+- goals
+- dietary_preferences
+- foods
+- branded_foods
+- recipes
+- recipe_ingredients
+- nutrition_facts
+- meal_logs
+- meal_log_items
+- favourites
+- workouts
+- progress_entries
+- reminders
+- challenges
+- badges
+- influencer_content
+- sync_mutations or equivalent offline tracking
+
+API areas required:
+- auth
+- profile
+- goals
+- foods/search
+- barcode lookup
+- favourites
+- recent foods
+- meals
+- recipes
+- AI recipe parse
+- progress
+- analytics
+- reminders
+- community
+- sync
+
+Implementation standards:
+- produce real file paths
+- produce complete file contents
+- keep code cohesive and runnable
+- no pseudo-code unless clearly marked as a future extension
+- add clear TODO markers only where external providers or paid APIs are required
+- comment tricky logic, but do not over-comment obvious code
+- make safe defaults
+- prefer maintainability over cleverness
+
+Business logic requirements:
+- calorie goal calculation should account for sex, age, height, weight, activity level, and goal type
+- meal logging should aggregate calories, protein, carbs, fats, and fibre
+- AI recipe parsing should:
+  - parse natural language ingredients
+  - normalise units
+  - estimate missing values
+  - assign confidence scores
+  - allow manual correction
+- offline sync should accept client mutation IDs and be idempotent
+- analytics should return daily summary and simple weekly trends
+- reminders should be queue-backed, retryable, and auditable
+
+Deliverables required in order:
+1. folder tree
+2. package.json
+3. environment example
+4. prisma schema
+5. source files
+6. worker files
+7. seed script
+8. test files
+9. run instructions
+10. list of remaining manual setup tasks
+
+When editing existing files:
+- preserve project style
+- do not break imports
+- update related tests
+- explain briefly what changed and why

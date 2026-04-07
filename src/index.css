@@ -1,0 +1,153 @@
+﻿@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 186 38% 97%;
+    --foreground: 205 34% 16%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 205 34% 16%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 205 34% 16%;
+
+    --primary: 157 56% 38%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 178 33% 92%;
+    --secondary-foreground: 205 30% 20%;
+
+    --muted: 192 28% 92%;
+    --muted-foreground: 205 14% 41%;
+
+    --accent: 201 72% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 188 25% 84%;
+    --input: 188 25% 84%;
+    --ring: 157 56% 38%;
+
+    --radius: 1.4rem;
+
+    --chart-1: 157 56% 38%;
+    --chart-2: 201 72% 48%;
+    --chart-3: 185 58% 44%;
+    --chart-4: 214 70% 54%;
+    --chart-5: 170 40% 45%;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 205 34% 16%;
+    --sidebar-primary: 157 56% 38%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 178 33% 92%;
+    --sidebar-accent-foreground: 205 34% 16%;
+    --sidebar-border: 188 25% 84%;
+    --sidebar-ring: 157 56% 38%;
+  }
+
+  .dark {
+    --background: 205 32% 10%;
+    --foreground: 186 24% 94%;
+
+    --card: 204 24% 14%;
+    --card-foreground: 186 24% 94%;
+
+    --popover: 204 24% 14%;
+    --popover-foreground: 186 24% 94%;
+
+    --primary: 158 52% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 198 20% 18%;
+    --secondary-foreground: 186 24% 90%;
+
+    --muted: 198 20% 18%;
+    --muted-foreground: 188 10% 66%;
+
+    --accent: 201 70% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 38%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 201 18% 22%;
+    --input: 201 18% 22%;
+    --ring: 158 52% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Instrument Sans", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overscroll-behavior: none;
+    overflow: hidden;
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--primary) / 0.16), transparent 24%),
+      radial-gradient(circle at top right, hsl(var(--accent) / 0.14), transparent 28%),
+      radial-gradient(circle at bottom center, hsl(var(--secondary-foreground) / 0.06), transparent 32%),
+      linear-gradient(180deg, hsl(184 65% 99%), hsl(var(--background)) 54%, hsl(191 42% 95%));
+  }
+
+  #root {
+    isolation: isolate;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .display-font {
+    font-family: "Space Grotesk", sans-serif;
+    letter-spacing: -0.03em;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
