@@ -4,6 +4,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../lib/api-error";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
+import { type GoalRecord, type ProfileResponseRecord } from "../../lib/service-contracts";
 import { calculateCalorieGoal } from "../../utils/calorie-goal";
 import { ActivityLevel, GoalType, Sex, type ActivityLevel as ActivityLevelValue, type GoalType as GoalTypeValue, type Sex as SexValue } from "../../lib/domain-enums";
 
@@ -22,7 +23,7 @@ type UpsertProfileInput = {
 };
 
 export async function calculateAndSaveGoalForUser(userId: string, goalType: GoalTypeValue) {
-  return withLocalFallback(
+  return withLocalFallback<GoalRecord>(
     "profile.calculateGoal",
     async () => {
       const profile = await prisma.userProfile.findUnique({
@@ -56,13 +57,13 @@ export async function calculateAndSaveGoalForUser(userId: string, goalType: Goal
         }
       });
     },
-    async () => localBackend.saveGoal(userId, goalType) as any
+    async () => localBackend.saveGoal(userId, goalType)
   );
 }
 
 export class ProfileService {
   async getMe(userId: string) {
-    return withLocalFallback(
+    return withLocalFallback<ProfileResponseRecord>(
       "profile.getMe",
       async () => {
         const user = await prisma.user.findUnique({
@@ -80,14 +81,14 @@ export class ProfileService {
 
         return user;
       },
-      async () => localBackend.getProfileResponse(userId) as any
+      async () => localBackend.getProfileResponse(userId)
     );
   }
 
   async upsertMe(userId: string, input: UpsertProfileInput) {
     const { displayName, preferences, dateOfBirth, ...profileInput } = input;
 
-    return withLocalFallback(
+    return withLocalFallback<ProfileResponseRecord>(
       "profile.upsertMe",
       async () =>
         prisma.$transaction(async (transaction: Prisma.TransactionClient) => {
@@ -137,7 +138,7 @@ export class ProfileService {
             }
           });
         }),
-      async () => localBackend.upsertProfile(userId, input) as any
+      async () => localBackend.upsertProfile(userId, input)
     );
   }
 

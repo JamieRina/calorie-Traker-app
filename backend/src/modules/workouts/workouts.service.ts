@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
+import { type WorkoutRecord } from "../../lib/service-contracts";
 
 type WorkoutsDbClient = Pick<typeof prisma, "workout">;
 
@@ -14,7 +15,7 @@ export type CreateWorkoutInput = {
 
 export class WorkoutsService {
   async create(userId: string, input: CreateWorkoutInput, db: WorkoutsDbClient = prisma) {
-    return withLocalFallback(
+    return withLocalFallback<WorkoutRecord>(
       "workouts.create",
       async () =>
         db.workout.create({
@@ -24,12 +25,12 @@ export class WorkoutsService {
             performedAt: new Date(input.performedAt)
           }
         }),
-      async () => localBackend.createWorkout(userId, input) as any
+      async () => localBackend.createWorkout(userId, input)
     );
   }
 
   async list(userId: string) {
-    return withLocalFallback(
+    return withLocalFallback<WorkoutRecord[]>(
       "workouts.list",
       async () =>
         prisma.workout.findMany({
@@ -37,7 +38,7 @@ export class WorkoutsService {
           orderBy: { performedAt: "desc" },
           take: 20
         }),
-      async () => localBackend.listWorkouts(userId) as any
+      async () => localBackend.listWorkouts(userId)
     );
   }
 }

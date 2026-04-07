@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import { prisma } from "../../config/prisma";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
+import { type DashboardResponseRecord } from "../../lib/service-contracts";
 
 type DailyTotals = {
   calories: number;
@@ -13,7 +14,7 @@ type DailyTotals = {
 
 export class AnalyticsService {
   async getDashboard(userId: string, date: string) {
-    return withLocalFallback(
+    return withLocalFallback<DashboardResponseRecord>(
       "analytics.dashboard",
       async () => {
         const day = dayjs(date);
@@ -113,7 +114,7 @@ export class AnalyticsService {
           latestProgress: progress
         };
       },
-      async () => localBackend.getDashboard(userId, date) as any
+      async () => localBackend.getDashboard(userId, date)
     );
   }
 }

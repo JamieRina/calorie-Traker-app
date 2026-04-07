@@ -4,6 +4,7 @@ import { ApiError } from "../../lib/api-error";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
 import { type MealType } from "../../lib/domain-enums";
+import { type MealRecord } from "../../lib/service-contracts";
 import { rollupNutrition, scaleNutrition } from "../../utils/nutrition";
 
 type MealsDbClient = Pick<typeof prisma, "food" | "recipe" | "mealLog">;
@@ -17,7 +18,7 @@ export type CreateMealInput = {
 
 export class MealsService {
   async createMeal(userId: string, input: CreateMealInput, db: MealsDbClient = prisma) {
-    return withLocalFallback(
+    return withLocalFallback<MealRecord>(
       "meals.create",
       async () => {
         const payloadItems = [];
@@ -90,16 +91,21 @@ export class MealsService {
             }
           },
           include: {
-            items: true
+            items: {
+              include: {
+                food: { include: { nutritionFact: true } },
+                recipe: { include: { nutritionFact: true } }
+              }
+            }
           }
         });
       },
-      async () => localBackend.createMeal(userId, input) as any
+      async () => localBackend.createMeal(userId, input)
     );
   }
 
   async getDailyMeals(userId: string, date: string) {
-    return withLocalFallback(
+    return withLocalFallback<MealRecord[]>(
       "meals.daily",
       async () => {
         const day = dayjs(date);
@@ -124,7 +130,7 @@ export class MealsService {
           }
         });
       },
-      async () => localBackend.getDailyMeals(userId, date) as any
+      async () => localBackend.getDailyMeals(userId, date)
     );
   }
 
@@ -152,7 +158,7 @@ export class MealsService {
           deletedMealId: mealId
         };
       },
-      async () => localBackend.removeMeal(userId, mealId) as any
+      async () => localBackend.removeMeal(userId, mealId)
     );
   }
 }

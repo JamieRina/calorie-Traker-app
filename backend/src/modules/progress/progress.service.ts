@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
+import { type ProgressRecord } from "../../lib/service-contracts";
 
 type ProgressDbClient = Pick<typeof prisma, "progressEntry">;
 
@@ -14,7 +15,7 @@ export type CreateProgressInput = {
 
 export class ProgressService {
   async create(userId: string, input: CreateProgressInput, db: ProgressDbClient = prisma) {
-    return withLocalFallback(
+    return withLocalFallback<ProgressRecord>(
       "progress.create",
       async () =>
         db.progressEntry.create({
@@ -24,12 +25,12 @@ export class ProgressService {
             recordedAt: new Date(input.recordedAt)
           }
         }),
-      async () => localBackend.createProgressEntry(userId, input) as any
+      async () => localBackend.createProgressEntry(userId, input)
     );
   }
 
   async list(userId: string) {
-    return withLocalFallback(
+    return withLocalFallback<ProgressRecord[]>(
       "progress.list",
       async () =>
         prisma.progressEntry.findMany({
@@ -37,7 +38,7 @@ export class ProgressService {
           orderBy: { recordedAt: "desc" },
           take: 30
         }),
-      async () => localBackend.listProgressEntries(userId) as any
+      async () => localBackend.listProgressEntries(userId)
     );
   }
 }
