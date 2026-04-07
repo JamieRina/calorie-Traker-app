@@ -21,7 +21,7 @@ export default function Settings() {
       <PageHeader
         eyebrow="Settings"
         title="Simple by default"
-        description="The lighter interface stays on by default. Advanced mode unlocks the extra detail without crowding the main screens."
+        description="The lighter interface stays on by default. Advanced mode adds detail without crowding the main screens."
       />
 
       <SectionCard
@@ -49,12 +49,12 @@ export default function Settings() {
               key={option.mode}
               onClick={() => setUiMode(option.mode)}
               className={`rounded-[24px] border p-4 text-left transition-all ${
-                uiMode === option.mode ? "border-white/20 bg-white/14 text-white" : "border-white/15 bg-white/8 text-white/85"
+                uiMode === option.mode ? "border-primary/15 bg-white/78 text-foreground" : "border-white/55 bg-white/54 text-foreground/85"
               }`}
             >
               <option.icon className="h-4 w-4" />
               <p className="mt-3 text-sm font-semibold">{option.title}</p>
-              <p className="mt-1 text-sm text-white/72">{option.detail}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{option.detail}</p>
             </button>
           ))}
         </div>
