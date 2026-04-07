@@ -53,10 +53,10 @@ export default function Activity() {
     <AppPage>
       <PageHeader
         eyebrow="Activity"
-        title="Movement without the clutter"
-        description={`For ${formatDateLabel(currentDate)}, this screen keeps the focus on workouts you actually logged.`}
+        title="Movement made simple"
+        description={`For ${formatDateLabel(currentDate)}, keep the focus on the workouts you actually logged.`}
         action={
-          <span className="rounded-full border border-white/80 bg-white/92 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
+          <span className="rounded-full border border-white/75 bg-white/88 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
             {uiMode === "advanced" ? "Advanced" : "Simple"}
           </span>
         }
@@ -89,26 +89,26 @@ export default function Activity() {
             variant="hero"
             eyebrow="Today"
             title={`${Math.round(dashboard.caloriesBurned)} kcal burned`}
-            description={`${dashboard.workoutCount} workouts logged so far.`}
+            description={`${dashboard.workoutCount} workouts logged today.`}
             action={
-              <div className="rounded-2xl border border-white/15 bg-white/12 px-3 py-2 text-right backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Net</p>
-                <p className="mt-1 text-sm font-semibold text-white">{Math.round(dashboard.netCalories)} kcal</p>
+              <div className="rounded-2xl border border-primary/10 bg-white/72 px-3 py-2 text-right backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Net</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{Math.round(dashboard.netCalories)} kcal</p>
               </div>
             }
           >
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Workouts</p>
-                <p className="display-font mt-2 text-2xl font-bold text-white">{dashboard.workoutCount}</p>
+              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Workouts</p>
+                <p className="display-font mt-2 text-2xl font-bold text-foreground">{dashboard.workoutCount}</p>
               </div>
-              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Food logged</p>
-                <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.daily.calories)} kcal</p>
+              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Food logged</p>
+                <p className="display-font mt-2 text-2xl font-bold text-foreground">{Math.round(dashboard.daily.calories)} kcal</p>
               </div>
-              <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Burned</p>
-                <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.caloriesBurned)} kcal</p>
+              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Burned</p>
+                <p className="display-font mt-2 text-2xl font-bold text-foreground">{Math.round(dashboard.caloriesBurned)} kcal</p>
               </div>
             </div>
           </SectionCard>
@@ -133,7 +133,7 @@ export default function Activity() {
                 }
                 workoutMutation.mutate(preset);
               }}
-              className="rounded-[24px] border border-white/80 bg-white/88 p-4 text-left transition-transform hover:-translate-y-0.5"
+              className="rounded-[24px] border border-white/75 bg-white/88 p-4 text-left transition-colors hover:bg-white"
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-foreground">{preset.type}</span>

@@ -22,8 +22,8 @@ const App = () => (
       <AppProvider>
         <BrowserRouter>
           <div className="flex h-full items-center justify-center bg-transparent px-3 py-3 sm:px-6 sm:py-6">
-            <div className="relative h-full w-full max-w-[430px] overflow-hidden rounded-[34px] border border-white/80 bg-[linear-gradient(180deg,hsl(var(--background)),hsl(34_100%_99%))] shadow-[0_42px_80px_-46px_rgba(30,39,34,0.28)] sm:h-[min(920px,100%)]">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--accent)/0.16),transparent_24%),radial-gradient(circle_at_top_right,hsl(var(--primary)/0.12),transparent_28%),linear-gradient(180deg,transparent,rgba(255,255,255,0.14))]" />
+            <div className="relative h-full w-full max-w-[430px] overflow-hidden rounded-[34px] border border-white/75 bg-[linear-gradient(180deg,hsl(var(--background)),hsl(188_55%_98%))] shadow-[0_42px_80px_-48px_rgba(21,46,54,0.24)] sm:h-[min(920px,100%)]">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.12),transparent_26%),radial-gradient(circle_at_top_right,hsl(var(--accent)/0.11),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.12),transparent_24%,rgba(255,255,255,0.1))]" />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/activity" element={<Activity />} />

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Flame, RefreshCw, Sparkles, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame, RefreshCw, UtensilsCrossed, Zap } from "lucide-react";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
 import { AppPage, MetricCard, SectionCard } from "@/components/app/AppPage";
@@ -96,12 +96,12 @@ export default function Dashboard() {
     <AppPage>
       <div className="flex items-start justify-between gap-4">
         <AppLogo />
-        <span className="rounded-full border border-white/80 bg-white/92 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
+        <span className="rounded-full border border-white/75 bg-white/88 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
           {uiMode === "advanced" ? "Advanced" : "Simple"}
         </span>
       </div>
 
-      <div className="flex items-center justify-between rounded-[24px] border border-white/85 bg-white/92 px-3 py-3 shadow-[0_16px_30px_-24px_rgba(29,38,48,0.16)]">
+      <div className="flex items-center justify-between rounded-[24px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(238,248,248,0.88))] px-3 py-3 shadow-[0_16px_30px_-24px_rgba(22,40,46,0.14)]">
         <button
           onClick={() => setCurrentDate(shiftDateKey(currentDate, -1))}
           className="flex h-10 w-10 items-center justify-center rounded-2xl text-foreground transition-colors hover:bg-secondary/70"
@@ -150,33 +150,33 @@ export default function Dashboard() {
           <SectionCard
             variant="hero"
             eyebrow="Today"
-            title={`${remainingCalories} kcal left`}
-            description={`${Math.round(dashboard.daily.calories)} eaten / ${calorieGoal} goal`}
-            action={
-              <div className="rounded-2xl border border-white/15 bg-white/12 px-3 py-2 text-right backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Burned</p>
-                <p className="mt-1 text-sm font-semibold text-white">{Math.round(dashboard.caloriesBurned)} kcal</p>
+          title={`${remainingCalories} kcal left`}
+          description={`${Math.round(dashboard.daily.calories)} logged today`}
+          action={
+              <div className="rounded-2xl border border-primary/10 bg-white/72 px-3 py-2 text-right backdrop-blur-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Burned</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{Math.round(dashboard.caloriesBurned)} kcal</p>
               </div>
             }
           >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/84">{dashboard.mealCount} meals</span>
-                  <span className="rounded-full bg-white/14 px-3 py-1.5 text-xs font-semibold text-white/84">{dashboard.workoutCount} workouts</span>
+                  <span className="rounded-full bg-white/72 px-3 py-1.5 text-xs font-semibold text-foreground">{dashboard.mealCount} meals</span>
+                  <span className="rounded-full bg-white/72 px-3 py-1.5 text-xs font-semibold text-foreground">{dashboard.workoutCount} workouts</span>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Logged</p>
-                    <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.daily.calories)} kcal</p>
+                  <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Logged</p>
+                    <p className="display-font mt-2 text-2xl font-bold text-foreground">{Math.round(dashboard.daily.calories)} kcal</p>
                   </div>
-                  <div className="rounded-[22px] bg-white/12 px-4 py-4 backdrop-blur-sm">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/68">Net</p>
-                    <p className="display-font mt-2 text-2xl font-bold text-white">{Math.round(dashboard.netCalories)} kcal</p>
+                  <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Goal</p>
+                    <p className="display-font mt-2 text-2xl font-bold text-foreground">{calorieGoal} kcal</p>
                   </div>
                 </div>
               </div>
-              <div className="mx-auto rounded-[30px] bg-white/95 p-4 shadow-[0_24px_44px_-26px_rgba(0,0,0,0.4)] sm:mx-0">
+              <div className="mx-auto rounded-[30px] bg-white/96 p-4 shadow-[0_22px_38px_-26px_rgba(25,53,63,0.24)] sm:mx-0">
                 <CalorieRing consumed={dashboard.daily.calories} goal={calorieGoal} size={168} />
               </div>
             </div>
@@ -184,8 +184,8 @@ export default function Dashboard() {
 
           <div className="grid gap-3 sm:grid-cols-3">
             <MetricCard icon={Flame} label="Consumed" value={`${Math.round(dashboard.daily.calories)} kcal`} detail={`${dashboard.mealCount} meals logged`} />
-            <MetricCard icon={Zap} label="Protein" value={`${Math.round(dashboard.daily.protein)}g`} detail={`Goal ${proteinGoal}g`} />
-            <MetricCard icon={Sparkles} label="Burned" value={`${Math.round(dashboard.caloriesBurned)} kcal`} detail={`${dashboard.workoutCount} workouts today`} tone="accent" />
+            <MetricCard icon={Zap} label="Burned" value={`${Math.round(dashboard.caloriesBurned)} kcal`} detail={`${dashboard.workoutCount} workouts today`} />
+            <MetricCard icon={UtensilsCrossed} label="Meals" value={`${dashboard.mealCount}`} detail={`Goal ${calorieGoal} kcal`} tone="accent" />
           </div>
 
           {uiMode === "advanced" ? (
@@ -212,7 +212,7 @@ export default function Dashboard() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Meals</p>
                 <h2 className="display-font mt-1 text-2xl font-bold tracking-tight text-foreground">Today&apos;s log</h2>
               </div>
-              <p className="text-sm text-muted-foreground">Keep it quick.</p>
+              <p className="text-sm text-muted-foreground">Add or remove in one tap.</p>
             </div>
             {mealTypes.map((mealType) => (
               <MealCard
