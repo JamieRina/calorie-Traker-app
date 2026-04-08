@@ -3,6 +3,11 @@ import { AuthenticatedRequest } from "../../middleware/auth";
 import { recipesService } from "./recipes.service";
 
 export class RecipesController {
+  async list(request: AuthenticatedRequest, response: Response) {
+    const result = await recipesService.listRecipes(request.user!.sub);
+    response.json(result);
+  }
+
   async parse(request: AuthenticatedRequest, response: Response) {
     const result = await recipesService.parseRecipe(
       request.body.title,

@@ -122,6 +122,25 @@ type FoodSearchApiResponse = {
   imageUrl: string | null;
 };
 
+
+type ApiRecipe = {
+  id: string;
+  title: string;
+  description: string | null;
+  servings: number;
+  ingredients: Array<{
+    id: string;
+    rawText: string;
+    ingredientName: string;
+    amount: number | null;
+    unit: string | null;
+    gramsEstimate: number | null;
+    caloriesEstimate: number | null;
+    confidence: number | null;
+  }>;
+  nutritionFact: ApiNutritionFact;
+};
+
 type ApiDashboardResponse = {
   date: string;
   daily: {
@@ -186,6 +205,28 @@ export type ProgressEntry = {
   mood?: string;
   note?: string;
   recordedAt: string;
+};
+
+
+export type RecipeSummary = {
+  id: string;
+  title: string;
+  description?: string;
+  servings: number;
+  servingSize: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  ingredients: Array<{
+    id: string;
+    name: string;
+    amount?: number;
+    unit?: string;
+    calories?: number;
+    rawText: string;
+  }>;
 };
 
 export type DashboardSummary = {
@@ -507,6 +548,30 @@ function mapSearchFood(result: FoodSearchApiResponse): SearchFood {
   };
 }
 
+
+function mapRecipe(recipe: ApiRecipe): RecipeSummary {
+  return {
+    id: recipe.id,
+    title: recipe.title,
+    description: recipe.description ?? undefined,
+    servings: recipe.servings,
+    servingSize: recipe.servings > 1 ? `1 of ${recipe.servings} servings` : '1 serving',
+    calories: recipe.nutritionFact.calories,
+    protein: recipe.nutritionFact.proteinGrams,
+    carbs: recipe.nutritionFact.carbsGrams,
+    fat: recipe.nutritionFact.fatGrams,
+    fiber: recipe.nutritionFact.fibreGrams ?? 0,
+    ingredients: recipe.ingredients.map((ingredient) => ({
+      id: ingredient.id,
+      name: ingredient.ingredientName,
+      amount: ingredient.amount ?? undefined,
+      unit: ingredient.unit ?? undefined,
+      calories: ingredient.caloriesEstimate ?? undefined,
+      rawText: ingredient.rawText,
+    })),
+  };
+}
+
 function mapWorkout(workout: ApiWorkout): WorkoutEntry {
   return {
     id: workout.id,
@@ -682,6 +747,85 @@ export async function createMealLog(input: {
       items: [
         {
           foodId,
+          portionCount: input.quantity,
+        },
+      ],
+    }),
+  });
+}
+
+
+export async function createRecipe(input: {
+  title: string;
+  description?: string;
+  servings: number;
+  ingredients: Array<{
+    name: string;
+    quantity: number;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    servingSize?: string;
+  }>;
+}) {
+  const nutrition = input.ingredients.reduce(
+    (totals, ingredient) => ({
+      calories: totals.calories + ingredient.calories * ingredient.quantity,
+      proteinGrams: totals.proteinGrams + ingredient.protein * ingredient.quantity,
+      carbsGrams: totals.carbsGrams + ingredient.carbs * ingredient.quantity,
+      fatGrams: totals.fatGrams + ingredient.fat * ingredient.quantity,
+      fibreGrams: totals.fibreGrams + ingredient.fiber * ingredient.quantity,
+    }),
+    {
+      calories: 0,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 0,
+      fibreGrams: 0,
+    },
+  );
+
+  const payload = await authedRequest<ApiRecipe>("/recipes", {
+    method: "POST",
+    body: JSON.stringify({
+      title: input.title,
+      description: input.description,
+      servings: input.servings,
+      nutrition,
+      ingredients: input.ingredients.map((ingredient) => ({
+        rawText: `${ingredient.quantity} x ${ingredient.name}`,
+        ingredientName: ingredient.name,
+        amount: ingredient.quantity,
+        unit: ingredient.servingSize,
+        caloriesEstimate: ingredient.calories * ingredient.quantity,
+      })),
+    }),
+  });
+
+  return mapRecipe(payload);
+}
+
+export async function listRecipes() {
+  const payload = await authedRequest<ApiRecipe[]>("/recipes");
+  return payload.map(mapRecipe);
+}
+
+export async function createRecipeMealLog(input: {
+  date: string;
+  mealType: MealType;
+  recipeId: string;
+  quantity: number;
+}) {
+  return authedRequest<ApiMealLog>("/meals", {
+    method: "POST",
+    body: JSON.stringify({
+      consumedAt: new Date(`${input.date}T12:00:00`).toISOString(),
+      mealType: input.mealType,
+      items: [
+        {
+          recipeId: input.recipeId,
           portionCount: input.quantity,
         },
       ],

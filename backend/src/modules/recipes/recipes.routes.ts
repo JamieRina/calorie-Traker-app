@@ -8,5 +8,6 @@ import { createRecipeSchema, parseRecipeSchema } from "./recipes.validators";
 export const recipesRouter = Router();
 
 recipesRouter.use(requireAuth);
+recipesRouter.get("/", asyncHandler(recipesController.list.bind(recipesController)));
 recipesRouter.post("/parse", validateBody(parseRecipeSchema), asyncHandler(recipesController.parse.bind(recipesController)));
 recipesRouter.post("/", validateBody(createRecipeSchema), asyncHandler(recipesController.create.bind(recipesController)));

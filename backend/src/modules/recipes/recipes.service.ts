@@ -10,6 +10,22 @@ export class RecipesService {
     return recipeParserService.parse(title, sourceText, servings);
   }
 
+  async listRecipes(userId: string) {
+    return prisma.recipe.findMany({
+      where: {
+        OR: [{ userId }, { userId: null }]
+      },
+      include: {
+        ingredients: true,
+        nutritionFact: true
+      },
+      orderBy: [
+        { updatedAt: "desc" },
+        { createdAt: "desc" }
+      ]
+    });
+  }
+
   async createRecipe(userId: string, input: CreateRecipeInput) {
     const nutritionFact = await prisma.nutritionFact.create({
       data: input.nutrition
