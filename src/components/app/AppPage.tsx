@@ -36,8 +36,8 @@ interface MetricCardProps {
 export function AppPage({ children }: AppPageProps) {
   return (
     <div className="relative flex h-full flex-col overflow-y-auto pb-28 no-scrollbar">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.12),transparent_34%),radial-gradient(circle_at_top_right,hsl(var(--accent)/0.1),transparent_40%)]" />
-      <div className="relative flex flex-col gap-4 px-5 pb-6 pt-6 safe-top">{children}</div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_34%),radial-gradient(circle_at_top_right,hsl(var(--hydration)/0.1),transparent_42%)]" />
+      <div className="relative flex flex-col gap-3.5 px-4 pb-6 pt-5 safe-top sm:px-5">{children}</div>
     </div>
   );
 }
@@ -46,9 +46,9 @@ export function PageHeader({ eyebrow, title, description, action }: PageHeaderPr
   return (
     <header className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">{eyebrow}</p>
-        <h1 className="display-font mt-2 text-[1.9rem] font-bold leading-none tracking-tight text-foreground">{title}</h1>
-        {description ? <p className="mt-3 max-w-[34ch] text-sm leading-6 text-muted-foreground">{description}</p> : null}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/60">{eyebrow}</p>
+        <h1 className="display-font mt-1.5 text-2xl font-bold leading-tight text-foreground">{title}</h1>
+        {description ? <p className="mt-1.5 max-w-[30ch] text-sm leading-5 text-muted-foreground">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </header>
@@ -68,11 +68,11 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "rounded-[28px] border p-4 shadow-[0_22px_40px_-34px_rgba(22,40,46,0.16)]",
-        variant === "default" && "border-white/75 bg-white/88 backdrop-blur-sm",
-        variant === "soft" && "border-primary/10 bg-[linear-gradient(180deg,hsl(var(--secondary)/0.8),hsl(var(--background)))]",
+        "rounded-[24px] border p-3.5 shadow-[var(--shadow-card)] sm:p-4",
+        variant === "default" && "app-card",
+        variant === "soft" && "app-card-soft",
         variant === "hero" &&
-          "border-primary/10 bg-[linear-gradient(145deg,hsl(var(--primary)/0.16),hsl(var(--accent)/0.12),rgba(255,255,255,0.94))] shadow-[0_26px_52px_-36px_hsl(var(--accent)/0.22)]",
+          "border-primary/20 bg-[linear-gradient(145deg,hsl(var(--primary)/0.16),hsl(var(--hydration)/0.08),hsl(var(--card)/0.94)_58%,hsl(var(--surface-success)/0.4))] backdrop-blur-xl",
         className,
       )}
     >
@@ -80,17 +80,17 @@ export function SectionCard({
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             {eyebrow ? (
-              <p className={cn("text-[11px] font-semibold uppercase tracking-[0.22em]", variant === "hero" ? "text-primary/65" : "text-primary/60")}>
+              <p className={cn("text-[10px] font-semibold uppercase tracking-[0.18em]", variant === "hero" ? "text-primary/70" : "text-primary/60")}>
                 {eyebrow}
               </p>
             ) : null}
             {title ? (
-              <h2 className={cn("display-font mt-1 text-xl font-bold tracking-tight", variant === "hero" ? "text-foreground" : "text-foreground")}>
+              <h2 className={cn("display-font mt-1 text-lg font-bold leading-tight", variant === "hero" ? "text-foreground" : "text-foreground")}>
                 {title}
               </h2>
             ) : null}
             {description ? (
-              <p className={cn("mt-2 max-w-[38ch] text-sm leading-6", variant === "hero" ? "text-muted-foreground" : "text-muted-foreground")}>
+              <p className={cn("mt-1.5 max-w-[30ch] text-sm leading-5", variant === "hero" ? "text-muted-foreground" : "text-muted-foreground")}>
                 {description}
               </p>
             ) : null}
@@ -98,7 +98,7 @@ export function SectionCard({
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>
       ) : null}
-      <div className={cn((eyebrow || title || action) && "mt-4", bodyClassName)}>{children}</div>
+      <div className={cn((eyebrow || title || action) && "mt-3", bodyClassName)}>{children}</div>
     </section>
   );
 }
@@ -107,18 +107,22 @@ export function MetricCard({ icon: Icon, label, value, detail, tone = "default",
   return (
     <article
       className={cn(
-        "rounded-[24px] border p-4 shadow-[0_16px_32px_-30px_rgba(21,39,48,0.16)]",
-        tone === "default" && "border-white/75 bg-white/88",
-        tone === "accent" && "border-accent/10 bg-accent/[0.06]",
+        "rounded-[22px] border p-3.5 shadow-[var(--shadow-card)] backdrop-blur-xl",
+        tone === "default" && "border-border/80 bg-card/90",
+        tone === "accent" && "border-primary/20 bg-primary/[0.08]",
         className,
       )}
     >
-      <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl", tone === "accent" ? "bg-accent text-accent-foreground" : "bg-secondary text-primary")}>
-        <Icon className="h-5 w-5" />
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl", tone === "accent" ? "bg-primary text-primary-foreground shadow-[var(--shadow-button)]" : "bg-primary/15 text-primary")}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/60">{label}</p>
+          <p className="display-font mt-1 text-xl font-bold text-foreground">{value}</p>
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{detail}</p>
+        </div>
       </div>
-      <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/60">{label}</p>
-      <p className="display-font mt-2 text-2xl font-bold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1 text-sm leading-5 text-muted-foreground">{detail}</p>
     </article>
   );
 }

@@ -1,16 +1,25 @@
 import type { DailyGoal, Food, MealType, Nutrients, UserProfile } from "@/context/AppContext";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000/api/v1";
-const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL ?? "demo@example.com";
-const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD ?? "Password123!";
-const DEMO_DISPLAY_NAME = import.meta.env.VITE_DEMO_DISPLAY_NAME ?? "Jamie";
 const SESSION_STORAGE_KEY = "nutritrack-session";
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
 const ALL_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
-type SessionTokens = {
+export type SessionTokens = {
   accessToken: string;
   refreshToken: string;
+};
+
+export type GoalType = "lose" | "maintain" | "gain";
+
+export type StarterProfileInput = {
+  displayName: string;
+  goalType: GoalType;
+  age: number;
+  heightCm: number;
+  currentWeightKg: number;
+  targetWeightKg: number;
+  activityLevel: "sedentary" | "light" | "moderate" | "active" | "athlete";
 };
 
 type ApiNutritionFact = {
@@ -111,7 +120,7 @@ type FoodSearchApiResponse = {
   name: string;
   brand: string | null;
   servingSize: string;
-  source: "local" | "open_food_facts";
+  source: "local" | "usda" | "open_food_facts";
   sourceLabel: string;
   calories: number;
   proteinGrams: number;
@@ -151,7 +160,7 @@ type ApiError = Error & {
 };
 
 export type SearchFood = Food & {
-  apiSource: "local" | "open_food_facts";
+  apiSource: "local" | "usda" | "open_food_facts";
   sourceLabel: string;
   barcode?: string;
   imageUrl?: string;
@@ -207,6 +216,35 @@ export type DashboardSummary = {
   latestProgress: ProgressEntry[];
 };
 
+export type CommunityFeed = {
+  featured: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    summary: string;
+    contentType: string;
+    authorName: string;
+    isPremium?: boolean;
+  }>;
+  latest: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    summary: string;
+    contentType: string;
+    authorName: string;
+    isPremium?: boolean;
+  }>;
+  challenges: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    description: string;
+    startsAt: string;
+    endsAt: string;
+  }>;
+};
+
 let sessionCache: SessionTokens | null = null;
 
 function createApiError(message: string, status?: number) {
@@ -249,6 +287,18 @@ function clearStoredSession() {
   if (isBrowser()) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
   }
+}
+
+function getApiRootUrl() {
+  return apiBaseUrl.replace(/\/api\/v\d+$/, "");
+}
+
+export function hasStoredSession() {
+  return Boolean(sessionCache ?? readStoredSession());
+}
+
+export function clearSession() {
+  clearStoredSession();
 }
 
 function defaultHeaders(init?: HeadersInit) {
@@ -304,21 +354,6 @@ async function requestAuthTokens(path: string, body: Record<string, unknown>) {
   });
 }
 
-async function loginDemoUser() {
-  return requestAuthTokens("/auth/login", {
-    email: DEMO_EMAIL,
-    password: DEMO_PASSWORD,
-  });
-}
-
-async function registerDemoUser() {
-  return requestAuthTokens("/auth/register", {
-    email: DEMO_EMAIL,
-    password: DEMO_PASSWORD,
-    displayName: DEMO_DISPLAY_NAME,
-  });
-}
-
 async function refreshSession() {
   const existingSession = sessionCache ?? readStoredSession();
   if (!existingSession?.refreshToken) {
@@ -344,30 +379,7 @@ async function ensureSession() {
     return storedSession;
   }
 
-  try {
-    const loggedIn = await loginDemoUser();
-    writeStoredSession(loggedIn);
-    return loggedIn;
-  } catch (error) {
-    const loginError = error as ApiError;
-    if (loginError.status && loginError.status !== 401 && loginError.status !== 404) {
-      throw loginError;
-    }
-  }
-
-  try {
-    const registered = await registerDemoUser();
-    writeStoredSession(registered);
-    return registered;
-  } catch (error) {
-    const registerError = error as ApiError;
-    if (registerError.status === 409) {
-      const loggedIn = await loginDemoUser();
-      writeStoredSession(loggedIn);
-      return loggedIn;
-    }
-    throw registerError;
-  }
+  throw createApiError("Please log in to continue.", 401);
 }
 
 async function authedRequest<T>(path: string, init?: RequestInit, allowRetry = true): Promise<T> {
@@ -392,6 +404,90 @@ async function authedRequest<T>(path: string, init?: RequestInit, allowRetry = t
   }
 
   return parseResponse<T>(response);
+}
+
+function dateOfBirthFromAge(age: number) {
+  const safeAge = Number.isFinite(age) ? Math.min(Math.max(Math.round(age), 13), 100) : 30;
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - safeAge);
+  date.setHours(12, 0, 0, 0);
+  return date.toISOString();
+}
+
+export async function checkBackendHealth() {
+  const response = await fetch(`${getApiRootUrl()}/health`, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  return parseResponse<{ status: string; timestamp: string }>(response);
+}
+
+export async function loginWithEmail(email: string, password: string) {
+  const session = await requestAuthTokens("/auth/login", {
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  writeStoredSession(session);
+  return session;
+}
+
+export async function saveStarterProfile(input: StarterProfileInput) {
+  await authedRequest<ApiProfileResponse>("/profile/me", {
+    method: "PATCH",
+    body: JSON.stringify({
+      displayName: input.displayName.trim(),
+      dateOfBirth: dateOfBirthFromAge(input.age),
+      sex: "undisclosed",
+      heightCm: input.heightCm,
+      currentWeightKg: input.currentWeightKg,
+      targetWeightKg: input.targetWeightKg,
+      activityLevel: input.activityLevel,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/London",
+      locale: navigator.language || "en-GB",
+      onboardingDone: true,
+      preferences: [
+        { type: "diet", value: "balanced" },
+        { type: "tracking", value: "fast_daily_logging" },
+      ],
+    }),
+  });
+
+  await authedRequest("/profile/goal", {
+    method: "POST",
+    body: JSON.stringify({
+      goalType: input.goalType,
+    }),
+  });
+}
+
+export async function registerAccount(input: StarterProfileInput & { email: string; password: string }) {
+  const session = await requestAuthTokens("/auth/register", {
+    email: input.email.trim().toLowerCase(),
+    password: input.password,
+    displayName: input.displayName.trim(),
+  });
+
+  writeStoredSession(session);
+  await saveStarterProfile(input);
+  return session;
+}
+
+export async function logoutAccount() {
+  const existingSession = sessionCache ?? readStoredSession();
+
+  try {
+    if (existingSession?.refreshToken) {
+      await publicRequest("/auth/logout", {
+        method: "POST",
+        body: JSON.stringify({ refreshToken: existingSession.refreshToken }),
+      });
+    }
+  } finally {
+    clearStoredSession();
+  }
 }
 
 function formatAge(dateOfBirth?: string | null) {
@@ -491,7 +587,7 @@ function mapSearchFood(result: FoodSearchApiResponse): SearchFood {
     name: result.name,
     brand: result.brand ?? undefined,
     servingSize: result.servingSize,
-    source: result.source === "open_food_facts" ? "Community" : "Verified",
+    source: result.source === "local" ? "Verified" : "Community",
     mealHints: ALL_MEAL_TYPES,
     calories: result.calories,
     protein: result.proteinGrams,
@@ -589,7 +685,12 @@ function normaliseImportedFood(food: Food | SearchFood) {
 }
 
 function needsFoodImport(food: Food | SearchFood) {
-  return food.id.startsWith("off-") || food.id.startsWith("food-") || ("apiSource" in food && food.apiSource === "open_food_facts");
+  return (
+    food.id.startsWith("off-") ||
+    food.id.startsWith("usda-") ||
+    food.id.startsWith("food-") ||
+    ("apiSource" in food && (food.apiSource === "open_food_facts" || food.apiSource === "usda"))
+  );
 }
 
 async function resolveFoodId(food: Food | SearchFood) {
@@ -599,46 +700,6 @@ async function resolveFoodId(food: Food | SearchFood) {
 
   const importedFood = await importFood(normaliseImportedFood(food));
   return importedFood.id;
-}
-
-async function ensureDemoProfile() {
-  const existingProfile = await authedRequest<ApiProfileResponse>("/profile/me");
-
-  if (existingProfile.profile?.currentWeightKg && existingProfile.profile?.heightCm && existingProfile.goal) {
-    return;
-  }
-
-  await authedRequest<ApiProfileResponse>("/profile/me", {
-    method: "PATCH",
-    body: JSON.stringify({
-      displayName: DEMO_DISPLAY_NAME,
-      dateOfBirth: "1995-06-15T12:00:00.000Z",
-      sex: "undisclosed",
-      heightCm: 175,
-      currentWeightKg: existingProfile.profile?.currentWeightKg ?? 81,
-      targetWeightKg: existingProfile.profile?.targetWeightKg ?? 76,
-      activityLevel: existingProfile.profile?.activityLevel ?? "moderate",
-      timezone: "Europe/London",
-      locale: "en-GB",
-      onboardingDone: true,
-      preferences: existingProfile.preferences.length > 0 ? existingProfile.preferences : [
-        { type: "diet", value: "high_protein" },
-        { type: "style", value: "simple_meals" },
-      ],
-    }),
-  });
-
-  await authedRequest("/profile/goal", {
-    method: "POST",
-    body: JSON.stringify({
-      goalType: existingProfile.goal?.goalType ?? "lose",
-    }),
-  });
-}
-
-export async function bootstrapSession() {
-  await ensureSession();
-  await ensureDemoProfile();
 }
 
 export async function searchFoods(query: string, limit = 12) {
@@ -748,5 +809,9 @@ export async function listProgressEntries() {
 export async function getProfileSummary() {
   const payload = await authedRequest<ApiProfileResponse>("/profile/me");
   return mapProfile(payload);
+}
+
+export async function getCommunityFeed() {
+  return publicRequest<CommunityFeed>("/community/feed");
 }
 

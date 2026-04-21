@@ -25,7 +25,7 @@ interface FoodSearchResult {
   name: string;
   brand: string | null;
   servingSize: string;
-  source: "local" | "open_food_facts";
+  source: "local" | "usda" | "open_food_facts";
   sourceLabel: string;
   calories: number;
   proteinGrams: number;
@@ -53,18 +53,40 @@ interface OpenFoodFactsProduct {
   code?: string;
   product_name?: string;
   brands?: string;
-  serving_size?: string;
-  image_front_small_url?: string;
-  image_small_url?: string;
   nutriments?: Record<string, number | string | undefined>;
-}
-
-interface OpenFoodFactsSearchResponse {
-  products?: OpenFoodFactsProduct[];
 }
 
 interface OpenFoodFactsProductResponse {
   product?: OpenFoodFactsProduct;
+}
+
+type UsdaFoodNutrient = {
+  nutrientId?: number;
+  nutrientName?: string;
+  unitName?: string;
+  value?: number;
+  amount?: number;
+  nutrient?: {
+    id?: number;
+    name?: string;
+    unitName?: string;
+  };
+};
+
+interface UsdaFoodItem {
+  fdcId?: number;
+  description?: string;
+  brandOwner?: string;
+  brandName?: string;
+  dataType?: string;
+  servingSize?: number;
+  servingSizeUnit?: string;
+  householdServingFullText?: string;
+  foodNutrients?: UsdaFoodNutrient[];
+}
+
+interface UsdaSearchResponse {
+  foods?: UsdaFoodItem[];
 }
 
 function buildBarcodeFoodSlug(productName: string, barcode: string) {
@@ -82,6 +104,10 @@ function getOpenFoodFactsHeaders() {
 function toNumber(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function roundNutrition(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 function normaliseServingSize(servingSize?: string | null, fallbackSize?: number | null, fallbackUnit?: string | null) {
@@ -118,29 +144,77 @@ function mapLocalFood(food: LocalFoodRecord): FoodSearchResult {
   };
 }
 
-function mapOpenFoodFactsProduct(product: OpenFoodFactsProduct): FoodSearchResult | null {
-  const productName = product.product_name?.trim();
-  if (!productName) {
+function getUsdaNutrientValue(food: UsdaFoodItem, nutrientId: number, nameMatchers: string[]) {
+  const nutrient = food.foodNutrients?.find((item) => {
+    const id = item.nutrientId ?? item.nutrient?.id;
+    if (id === nutrientId) {
+      return true;
+    }
+
+    const name = (item.nutrientName ?? item.nutrient?.name ?? "").toLowerCase();
+    return nameMatchers.some((matcher) => name.includes(matcher));
+  });
+
+  return toNumber(nutrient?.value ?? nutrient?.amount);
+}
+
+function getUsdaServing(food: UsdaFoodItem) {
+  const size = toNumber(food.servingSize);
+  const unit = food.servingSizeUnit?.trim();
+  const household = food.householdServingFullText?.trim();
+  const unitLower = unit?.toLowerCase() ?? "";
+  const canScaleByWeight = size > 0 && (unitLower === "g" || unitLower === "gram" || unitLower === "grams");
+  const multiplier = canScaleByWeight ? size / 100 : 1;
+
+  if (size > 0 && unit) {
+    return {
+      label: `${size} ${unit}`,
+      multiplier
+    };
+  }
+
+  if (household) {
+    return {
+      label: household,
+      multiplier
+    };
+  }
+
+  return {
+    label: "100 g",
+    multiplier: 1
+  };
+}
+
+function mapUsdaFood(food: UsdaFoodItem): FoodSearchResult | null {
+  const fdcId = food.fdcId;
+  const name = food.description?.trim();
+  if (!fdcId || !name) {
     return null;
   }
 
-  const nutriments = product.nutriments ?? {};
-  const barcode = product.code?.trim() || null;
+  const serving = getUsdaServing(food);
+  const brand = food.brandOwner?.trim() || food.brandName?.trim() || null;
+  const calories = getUsdaNutrientValue(food, 1008, ["energy"]);
+  const protein = getUsdaNutrientValue(food, 1003, ["protein"]);
+  const carbs = getUsdaNutrientValue(food, 1005, ["carbohydrate"]);
+  const fat = getUsdaNutrientValue(food, 1004, ["total lipid", "fat"]);
+  const fibre = getUsdaNutrientValue(food, 1079, ["fiber", "fibre"]);
 
   return {
-    id: barcode ? `off-${barcode}` : `off-${slugify(productName, { lower: true, strict: true }) || "food"}`,
-    name: productName,
-    brand: product.brands?.trim() || null,
-    servingSize: normaliseServingSize(product.serving_size),
-    source: "open_food_facts",
-    sourceLabel: "Open Food Facts",
-    calories: toNumber(nutriments["energy-kcal_100g"] ?? nutriments["energy-kcal"]),
-    proteinGrams: toNumber(nutriments.proteins_100g ?? nutriments.proteins),
-    carbsGrams: toNumber(nutriments.carbohydrates_100g ?? nutriments.carbohydrates),
-    fatGrams: toNumber(nutriments.fat_100g ?? nutriments.fat),
-    fibreGrams: toNumber(nutriments.fiber_100g ?? nutriments.fiber),
-    barcode,
-    imageUrl: product.image_front_small_url?.trim() || product.image_small_url?.trim() || null
+    id: `usda-${fdcId}`,
+    name,
+    brand,
+    servingSize: serving.label,
+    source: "usda",
+    sourceLabel: food.dataType ? `USDA ${food.dataType}` : "USDA FoodData Central",
+    calories: roundNutrition(calories * serving.multiplier),
+    proteinGrams: roundNutrition(protein * serving.multiplier),
+    carbsGrams: roundNutrition(carbs * serving.multiplier),
+    fatGrams: roundNutrition(fat * serving.multiplier),
+    fibreGrams: roundNutrition(fibre * serving.multiplier),
+    barcode: null,
+    imageUrl: null
   };
 }
 
@@ -198,21 +272,21 @@ export class FoodsService {
         });
 
         const localResults = foods.map(mapLocalFood);
-        const openFoodFactsResults =
+        const usdaResults =
           localResults.length >= limit || trimmedQuery.length < 2
             ? []
-            : await this.searchOpenFoodFacts(trimmedQuery, Math.min(Math.max(limit * 2, 8), 20));
+            : await this.searchUsdaFoods(trimmedQuery, Math.min(Math.max(limit * 2, 8), 25), localResults);
 
-        return dedupeFoods([...localResults, ...openFoodFactsResults], limit);
+        return dedupeFoods([...localResults, ...usdaResults], limit);
       },
       async () => {
         const localResults = localBackend.searchFoods(trimmedQuery, limit);
-        const openFoodFactsResults =
+        const usdaResults =
           localResults.length >= limit || trimmedQuery.length < 2
             ? []
-            : await this.searchOpenFoodFacts(trimmedQuery, Math.min(Math.max(limit * 2, 8), 20));
+            : await this.searchUsdaFoods(trimmedQuery, Math.min(Math.max(limit * 2, 8), 25), localResults);
 
-        return dedupeFoods([...localResults, ...openFoodFactsResults], limit);
+        return dedupeFoods([...localResults, ...usdaResults], limit);
       }
     );
 
@@ -512,42 +586,105 @@ export class FoodsService {
     );
   }
 
-  private async searchOpenFoodFacts(query: string, limit: number) {
-    const searchUrl = new URL("/cgi/search.pl", env.OPEN_FOOD_FACTS_BASE_URL);
-    searchUrl.searchParams.set("action", "process");
-    searchUrl.searchParams.set("json", "1");
-    searchUrl.searchParams.set("search_terms", query);
-    searchUrl.searchParams.set("page_size", String(limit));
-    searchUrl.searchParams.set(
-      "fields",
-      ["code", "product_name", "brands", "serving_size", "image_front_small_url", "image_small_url", "nutriments"].join(",")
-    );
+  private async searchUsdaFoods(query: string, limit: number, fallbackResults: FoodSearchResult[]) {
+    if (!env.USDA_API_KEY) {
+      if (fallbackResults.length > 0) {
+        return [];
+      }
+
+      throw new ApiError(503, "USDA API key is missing. Paste it into backend/.env on the USDA_API_KEY line.");
+    }
+
+    const searchUrl = new URL(`${env.USDA_BASE_URL.replace(/\/$/, "")}/foods/search`);
+    searchUrl.searchParams.set("api_key", env.USDA_API_KEY);
+    searchUrl.searchParams.set("query", query);
+    searchUrl.searchParams.set("pageSize", String(limit));
+    searchUrl.searchParams.set("sortBy", "dataType.keyword");
+    searchUrl.searchParams.set("sortOrder", "asc");
 
     try {
       const response = await fetch(searchUrl, {
-        headers: getOpenFoodFactsHeaders()
+        headers: {
+          Accept: "application/json"
+        }
       });
 
       if (!response.ok) {
+        if (response.status === 403) {
+          throw new ApiError(401, "USDA API key was rejected. Check the USDA_API_KEY value in backend/.env.");
+        }
+
+        if (response.status === 429) {
+          throw new ApiError(429, "USDA FoodData Central rate limit reached. Please wait and try again.");
+        }
+
         logger.warn(
           {
             query,
             limit,
             statusCode: response.status
           },
-          "Open Food Facts search request failed"
+          "USDA FoodData Central search request failed"
         );
+        throw new ApiError(502, "USDA FoodData Central search failed. Please try again.");
+      }
+
+      const data = (await response.json()) as UsdaSearchResponse;
+      return (data.foods ?? [])
+        .map(mapUsdaFood)
+        .filter((food): food is FoodSearchResult => Boolean(food));
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+
+      logger.warn({ err: error, query, limit }, "USDA FoodData Central search unavailable");
+
+      if (fallbackResults.length > 0) {
         return [];
       }
 
-      const data = (await response.json()) as OpenFoodFactsSearchResponse;
-      return (data.products ?? [])
-        .map(mapOpenFoodFactsProduct)
-        .filter((food): food is FoodSearchResult => Boolean(food));
-    } catch (error) {
-      logger.warn({ err: error, query, limit }, "Open Food Facts search unavailable");
-      return [];
+      throw new ApiError(503, "USDA FoodData Central is unavailable right now. Please try again later.");
     }
+  }
+
+  async getUsdaFoodDetail(fdcId: string) {
+    if (!env.USDA_API_KEY) {
+      throw new ApiError(503, "USDA API key is missing. Paste it into backend/.env on the USDA_API_KEY line.");
+    }
+
+    const detailUrl = new URL(`${env.USDA_BASE_URL.replace(/\/$/, "")}/food/${fdcId}`);
+    detailUrl.searchParams.set("api_key", env.USDA_API_KEY);
+
+    const response = await fetch(detailUrl, {
+      headers: {
+        Accept: "application/json"
+      }
+    });
+
+    if (response.status === 404) {
+      throw new ApiError(404, "USDA food not found.");
+    }
+
+    if (response.status === 403) {
+      throw new ApiError(401, "USDA API key was rejected. Check the USDA_API_KEY value in backend/.env.");
+    }
+
+    if (response.status === 429) {
+      throw new ApiError(429, "USDA FoodData Central rate limit reached. Please wait and try again.");
+    }
+
+    if (!response.ok) {
+      throw new ApiError(502, "USDA FoodData Central detail lookup failed.");
+    }
+
+    const data = (await response.json()) as UsdaFoodItem;
+    const mappedFood = mapUsdaFood(data);
+    if (!mappedFood) {
+      throw new ApiError(404, "USDA food did not include usable nutrition data.");
+    }
+
+    return mappedFood;
   }
 }
 

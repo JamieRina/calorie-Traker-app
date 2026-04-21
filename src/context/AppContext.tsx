@@ -1,8 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { bootstrapSession } from "@/lib/api";
+import { checkBackendHealth } from "@/lib/api";
 
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
 export type AppMode = "simple" | "advanced";
+export type ThemeMode = "dark" | "light";
+export type ResolvedTheme = "dark" | "light";
 
 export interface Nutrients {
   calories: number;
@@ -77,6 +79,9 @@ interface AppContextType {
   setCurrentDate: (date: string) => void;
   uiMode: AppMode;
   setUiMode: (mode: AppMode) => void;
+  themeMode: ThemeMode;
+  resolvedTheme: ResolvedTheme;
+  setThemeMode: (mode: ThemeMode) => void;
   isBackendReady: boolean;
   isBootstrapping: boolean;
   backendError: string | null;
@@ -88,6 +93,7 @@ interface AppContextType {
 }
 
 const UI_MODE_STORAGE_KEY = "nutritrack-ui-mode";
+const THEME_MODE_STORAGE_KEY = "nutritrack-theme-mode";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -110,6 +116,15 @@ function readStoredMode(): AppMode {
 
   const stored = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
   return stored === "advanced" ? "advanced" : "simple";
+}
+
+function readStoredThemeMode(): ThemeMode {
+  if (typeof window === "undefined") {
+    return "dark";
+  }
+
+  const stored = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+  return stored === "light" ? "light" : "dark";
 }
 
 function mergeFoods(existingFoods: Food[], incomingFoods: Food[]) {
@@ -247,6 +262,7 @@ export const FOOD_DATABASE: Food[] = [
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentDate, setCurrentDate] = useState(() => formatDateKey(new Date()));
   const [uiMode, setUiModeState] = useState<AppMode>(() => readStoredMode());
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(() => readStoredThemeMode());
   const [isBackendReady, setIsBackendReady] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [backendError, setBackendError] = useState<string | null>(null);
@@ -259,7 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setIsBootstrapping(true);
     setBackendError(null);
 
-    bootstrapSession()
+    checkBackendHealth()
       .then(() => {
         if (!isActive) {
           return;
@@ -273,7 +289,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         setIsBackendReady(false);
-        setBackendError(error instanceof Error ? error.message : "Backend connection failed");
+        setBackendError(error instanceof Error ? error.message : "Data service unavailable");
       })
       .finally(() => {
         if (isActive) {
@@ -292,8 +308,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [uiMode]);
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
+    }
+  }, [themeMode]);
+
+  const resolvedTheme: ResolvedTheme = themeMode;
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
+    document.documentElement.classList.toggle("light", resolvedTheme === "light");
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
+
   const setUiMode = useCallback((mode: AppMode) => {
     setUiModeState(mode);
+  }, []);
+
+  const setThemeMode = useCallback((mode: ThemeMode) => {
+    setThemeModeState(mode);
   }, []);
 
   const retryBackendConnection = useCallback(() => {
@@ -314,6 +352,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCurrentDate,
       uiMode,
       setUiMode,
+      themeMode,
+      resolvedTheme,
+      setThemeMode,
       isBackendReady,
       isBootstrapping,
       backendError,
@@ -331,7 +372,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       rememberFoods,
       rememberedFoods,
       retryBackendConnection,
+      resolvedTheme,
+      setThemeMode,
       setUiMode,
+      themeMode,
       uiMode,
     ],
   );

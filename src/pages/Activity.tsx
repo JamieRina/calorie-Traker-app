@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, Dumbbell, Flame, MapPinned, Plus, RefreshCw } from "lucide-react";
+import { Clock3, MapPinned, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { AppPage, MetricCard, PageHeader, SectionCard } from "@/components/app/AppPage";
+import { AppPage, PageHeader, SectionCard } from "@/components/app/AppPage";
 import { createWorkoutEntry, getDashboard, listWorkouts } from "@/lib/api";
 import { useApp } from "@/context/AppContext";
 
@@ -14,7 +14,7 @@ function formatDateLabel(dateKey: string) {
 }
 
 export default function Activity() {
-  const { currentDate, uiMode, routeLibrary, workoutPresets, isBackendReady, backendError, retryBackendConnection } = useApp();
+  const { currentDate, uiMode, routeLibrary, workoutPresets, isBackendReady } = useApp();
   const queryClient = useQueryClient();
 
   const dashboardQuery = useQuery({
@@ -53,35 +53,14 @@ export default function Activity() {
     <AppPage>
       <PageHeader
         eyebrow="Activity"
-        title="Movement made simple"
-        description={`For ${formatDateLabel(currentDate)}, keep the focus on the workouts you actually logged.`}
+        title="Activity"
+        description={formatDateLabel(currentDate)}
         action={
-          <span className="rounded-full border border-white/75 bg-white/88 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary/70 shadow-sm">
+          <span className="app-chip text-primary">
             {uiMode === "advanced" ? "Advanced" : "Simple"}
           </span>
         }
       />
-
-      {!isBackendReady ? (
-        <SectionCard
-          eyebrow="Backend"
-          title="Workout sync needs the backend"
-          description={backendError ?? "The app could not reach the backend yet."}
-          action={
-            <button
-              onClick={retryBackendConnection}
-              className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </button>
-          }
-        >
-          <div className="rounded-[22px] bg-secondary/35 px-4 py-4 text-sm text-muted-foreground">
-            Start the backend and this page will switch to live workout data.
-          </div>
-        </SectionCard>
-      ) : null}
 
       {dashboard ? (
         <>
@@ -89,51 +68,39 @@ export default function Activity() {
             variant="hero"
             eyebrow="Today"
             title={`${Math.round(dashboard.caloriesBurned)} kcal burned`}
-            description={`${dashboard.workoutCount} workouts logged today.`}
-            action={
-              <div className="rounded-2xl border border-primary/10 bg-white/72 px-3 py-2 text-right backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Net</p>
-                <p className="mt-1 text-sm font-semibold text-foreground">{Math.round(dashboard.netCalories)} kcal</p>
-              </div>
-            }
+            description={`${dashboard.workoutCount} workouts`}
           >
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Workouts</p>
-                <p className="display-font mt-2 text-2xl font-bold text-foreground">{dashboard.workoutCount}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-[18px] bg-card/60 px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Workouts</p>
+                <p className="display-font mt-1 text-xl font-bold text-foreground">{dashboard.workoutCount}</p>
               </div>
-              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Food logged</p>
-                <p className="display-font mt-2 text-2xl font-bold text-foreground">{Math.round(dashboard.daily.calories)} kcal</p>
+              <div className="rounded-[18px] bg-card/60 px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Food</p>
+                <p className="display-font mt-1 text-xl font-bold text-foreground">{Math.round(dashboard.daily.calories)}</p>
               </div>
-              <div className="rounded-[22px] border border-white/65 bg-white/66 px-4 py-4 backdrop-blur-sm">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/60">Burned</p>
-                <p className="display-font mt-2 text-2xl font-bold text-foreground">{Math.round(dashboard.caloriesBurned)} kcal</p>
+              <div className="rounded-[18px] bg-card/60 px-3 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Net</p>
+                <p className="display-font mt-1 text-xl font-bold text-foreground">{Math.round(dashboard.netCalories)}</p>
               </div>
             </div>
           </SectionCard>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <MetricCard icon={Flame} label="Today burn" value={`${Math.round(dashboard.caloriesBurned)} kcal`} detail={`${dashboard.workoutCount} workouts`} />
-            <MetricCard icon={Dumbbell} label="Latest intake" value={`${Math.round(dashboard.daily.calories)} kcal`} detail={`${dashboard.mealCount} meals logged`} />
-            <MetricCard icon={Clock3} label="Recent sessions" value={`${dashboard.workouts.length}`} detail="Counted in today's total" tone="accent" />
-          </div>
         </>
       ) : null}
 
-      <SectionCard eyebrow="Quick Log" title="Fast preset workouts" description="One tap is enough for the sessions you repeat most often.">
+      <SectionCard eyebrow="Quick log" title="Presets">
         <div className="grid gap-3 sm:grid-cols-2">
           {workoutPresets.map((preset) => (
             <button
               key={preset.type}
               onClick={() => {
                 if (!isBackendReady) {
-                  toast.error("Start the backend before logging workouts.");
+                  toast.error("Workout logging is still getting ready. Try again in a moment.");
                   return;
                 }
                 workoutMutation.mutate(preset);
               }}
-              className="rounded-[24px] border border-white/75 bg-white/88 p-4 text-left transition-colors hover:bg-white"
+              className="rounded-[22px] border border-border/80 bg-card/90 p-3.5 text-left shadow-[var(--shadow-card)] transition-colors hover:bg-surface-elevated/75"
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-foreground">{preset.type}</span>
@@ -141,26 +108,26 @@ export default function Activity() {
                   <Plus className="h-4 w-4" />
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <span className="rounded-full bg-secondary px-3 py-1.5">{preset.durationMinutes} min</span>
                 <span className="rounded-full bg-secondary px-3 py-1.5">{preset.caloriesBurned} kcal</span>
-                <span className="rounded-full bg-secondary px-3 py-1.5">{preset.intensity}</span>
+                {uiMode === "advanced" ? <span className="rounded-full bg-secondary px-3 py-1.5">{preset.intensity}</span> : null}
               </div>
             </button>
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard eyebrow="Logged" title="Your recent workouts" description="Only the items that have actually been saved to the backend show up here.">
-        <div className="space-y-3">
+      <SectionCard eyebrow="Logged" title="Recent">
+        <div className="space-y-2.5">
           {(workoutsQuery.data ?? []).length === 0 ? (
             <div className="rounded-[22px] border border-dashed border-primary/20 bg-secondary/30 px-4 py-5 text-sm text-muted-foreground">
               Log a preset above and it will appear here.
             </div>
           ) : (
             (workoutsQuery.data ?? []).slice(0, 8).map((workout) => (
-              <div key={workout.id} className="flex items-center gap-3 rounded-[22px] border border-white/80 bg-secondary/25 px-4 py-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+              <div key={workout.id} className="flex items-center gap-3 rounded-[18px] bg-surface-elevated/35 px-3.5 py-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                   <Clock3 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -179,18 +146,18 @@ export default function Activity() {
       </SectionCard>
 
       {uiMode === "advanced" ? (
-        <SectionCard eyebrow="Advanced" title="Walking ideas" description="Optional extras stay hidden until you choose advanced mode.">
+        <SectionCard eyebrow="Advanced" title="Routes">
           <div className="space-y-3">
             {routeLibrary.map((route) => (
-              <article key={route.id} className="flex items-start gap-3 rounded-[24px] border border-white/80 bg-secondary/25 p-4">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary shadow-sm">
+              <article key={route.id} className="flex items-start gap-3 rounded-[24px] border border-border/80 bg-surface-elevated/35 p-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                   <MapPinned className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">{route.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{route.location}</p>
                 </div>
-                <div className="rounded-2xl bg-white px-3 py-2 text-right text-sm font-semibold text-foreground shadow-sm">
+                <div className="rounded-2xl border border-border/70 bg-card/80 px-3 py-2 text-right text-sm font-semibold text-foreground">
                   <p>{route.distanceKm.toFixed(1)} km</p>
                   <p className="mt-1 text-xs text-muted-foreground">{route.estimatedBurn} kcal</p>
                 </div>

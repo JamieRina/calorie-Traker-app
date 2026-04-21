@@ -22,6 +22,7 @@ const defaults = {
   JWT_ACCESS_TTL: "15m",
   JWT_REFRESH_TTL: "30d",
   OPENAI_MODEL: "gpt-4.1-mini",
+  USDA_BASE_URL: "https://api.nal.usda.gov/fdc/v1",
   OPEN_FOOD_FACTS_BASE_URL: "https://world.openfoodfacts.org",
   OPEN_FOOD_FACTS_USER_AGENT: "NutriTrackPro/0.1 (replace-with-your-email@example.com)",
   REMINDER_QUEUE_NAME: "reminders",
@@ -41,8 +42,8 @@ const envSchema = z.object({
   JWT_REFRESH_TTL: z.string().default("30d"),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-4.1-mini"),
-  NUTRITIONIX_APP_ID: z.string().optional(),
-  NUTRITIONIX_APP_KEY: z.string().optional(),
+  USDA_API_KEY: z.string().optional(),
+  USDA_BASE_URL: z.string().url().default("https://api.nal.usda.gov/fdc/v1"),
   OPEN_FOOD_FACTS_BASE_URL: z.string().default("https://world.openfoodfacts.org"),
   OPEN_FOOD_FACTS_USER_AGENT: z.string().min(1).default("NutriTrackPro/0.1 (replace-with-your-email@example.com)"),
   REMINDER_QUEUE_NAME: z.string().default("reminders"),
@@ -58,6 +59,7 @@ const appOrigins = parsedEnv.APP_ORIGIN
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+const usdaApiKey = parsedEnv.USDA_API_KEY?.trim();
 
 const unsafeProductionValues = [
   parsedEnv.DATABASE_URL === defaults.DATABASE_URL ? "DATABASE_URL" : null,
@@ -74,6 +76,7 @@ if (parsedEnv.NODE_ENV === "production" && unsafeProductionValues.length > 0) {
 
 export const env = {
   ...parsedEnv,
+  USDA_API_KEY: usdaApiKey && usdaApiKey !== "YOUR_USDA_API_KEY_HERE" ? usdaApiKey : undefined,
   APP_ORIGINS: appOrigins,
   PRIMARY_APP_ORIGIN: appOrigins[0] ?? defaultAppOrigins[0]
 };

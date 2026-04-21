@@ -13,7 +13,7 @@ export function MacroBar({ label, current, goal, color, unit = "g" }: MacroBarPr
   const percentage = Math.min((current / safeGoal) * 100, 100);
 
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-[0_18px_32px_-28px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+    <div className="rounded-[22px] border border-border/80 bg-surface-elevated/60 p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</span>
         <span className="display-font text-sm font-bold text-foreground">
@@ -21,7 +21,7 @@ export function MacroBar({ label, current, goal, color, unit = "g" }: MacroBarPr
           {unit}
         </span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
+      <div className="h-2.5 overflow-hidden rounded-full bg-secondary/80">
         <motion.div
           className="h-full rounded-full"
           style={{ backgroundColor: color }}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Heart, History, LoaderCircle, Plus, Search, SearchCode, Sparkles, Star } from "lucide-react";
+import { ArrowLeft, Heart, History, LoaderCircle, Plus, Search, SearchCode, Star } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AppPage, PageHeader, SectionCard } from "@/components/app/AppPage";
@@ -12,17 +12,17 @@ import { cn } from "@/lib/utils";
 
 const SEARCH_MIN_LENGTH = 2;
 
-const mealOptions: Array<{ value: MealType; subtitle: string }> = [
-  { value: "breakfast", subtitle: "Morning meals" },
-  { value: "lunch", subtitle: "Midday reset" },
-  { value: "dinner", subtitle: "Evening meal" },
-  { value: "snack", subtitle: "Small top-up" },
+const mealOptions: MealType[] = [
+  "breakfast",
+  "lunch",
+  "dinner",
+  "snack",
 ];
 
 const tabs = [
   { value: "recent", label: "Recent", icon: History },
-  { value: "favourites", label: "Favourites", icon: Heart },
-  { value: "all", label: "Starter foods", icon: Star },
+  { value: "favourites", label: "Saved", icon: Heart },
+  { value: "all", label: "Starter", icon: Star },
 ] as const;
 
 type Tab = (typeof tabs)[number]["value"];
@@ -55,7 +55,7 @@ export default function AddMeal() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const { currentDate, rememberFoods, uiMode, isBackendReady, backendError } = useApp();
+  const { currentDate, rememberFoods, uiMode, isBackendReady } = useApp();
   const [search, setSearch] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [tab, setTab] = useState<Tab>("recent");
@@ -210,13 +210,12 @@ export default function AddMeal() {
   return (
     <AppPage>
       <PageHeader
-        eyebrow="Add Food"
-        title="Pick a food and log it"
-        description="Keep this screen simple: choose the meal, search when needed, and save the ones you repeat."
+        eyebrow="Log"
+        title="Add food"
         action={
           <button
             onClick={() => navigate(-1)}
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/85 bg-white/92 shadow-[0_18px_30px_-26px_rgba(22,30,43,0.16)]"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 bg-card/90 shadow-[var(--shadow-card)]"
             aria-label="Go back"
           >
             <ArrowLeft className="h-4 w-4 text-foreground" />
@@ -224,34 +223,27 @@ export default function AddMeal() {
         }
       />
 
-      <SectionCard eyebrow="Meal" title={MEAL_LABELS[selectedMeal]} description="Everything you add here goes into this meal.">
-        <div className="grid grid-cols-2 gap-3">
+      <SectionCard eyebrow="Meal" title={MEAL_LABELS[selectedMeal]}>
+        <div className="grid grid-cols-4 gap-2">
           {mealOptions.map((meal) => (
             <button
-              key={meal.value}
-              onClick={() => setSelectedMeal(meal.value)}
+              key={meal}
+              onClick={() => setSelectedMeal(meal)}
               className={cn(
-                "rounded-[22px] border px-4 py-3 text-left transition-all",
-                selectedMeal === meal.value
+                "min-h-11 rounded-2xl border px-2 py-2 text-center text-xs font-semibold transition-all",
+                selectedMeal === meal
                   ? "border-primary bg-primary text-primary-foreground shadow-[0_18px_30px_-24px_hsl(var(--primary)/0.45)]"
-                  : "border-white/85 bg-white/88 text-foreground hover:bg-white",
+                  : "border-border/80 bg-card/80 text-foreground hover:bg-surface-elevated/80",
               )}
             >
-              <p className="text-sm font-semibold">{MEAL_LABELS[meal.value]}</p>
-              <p className={cn("mt-1 text-xs", selectedMeal === meal.value ? "text-primary-foreground/80" : "text-muted-foreground")}>
-                {meal.subtitle}
-              </p>
+              {MEAL_LABELS[meal]}
             </button>
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard
-        eyebrow="Search"
-        title="Recent first, database when needed"
-        description="Browse your own repeats or run a live backend search for something new."
-      >
-        <form onSubmit={handleSearchSubmit} className="space-y-4">
+      <SectionCard eyebrow="Search" title="Find food">
+        <form onSubmit={handleSearchSubmit} className="space-y-3">
           <div className="flex gap-3">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -259,23 +251,17 @@ export default function AddMeal() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search foods or brands"
-                className="h-12 rounded-2xl border-white/85 bg-white/95 pl-11"
+                className="h-12 border-border/80 bg-surface-elevated/80 pl-11"
               />
             </div>
             <button
               type="submit"
-              className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_18px_30px_-24px_hsl(var(--primary)/0.55)]"
+              className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-[0_18px_30px_-24px_hsl(var(--primary)/0.55)]"
+              aria-label="Search foods"
             >
               {searchQuery.isFetching ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <SearchCode className="h-4 w-4" />}
-              <span className="hidden sm:inline">Search</span>
             </button>
           </div>
-
-          <p className="text-xs text-muted-foreground">
-            {search.trim().length >= SEARCH_MIN_LENGTH
-              ? "Searching your saved foods and the live food database."
-              : `Type ${SEARCH_MIN_LENGTH} or more characters for live food search.`}
-          </p>
 
           <div className="grid grid-cols-3 gap-2">
             {tabs.map((item) => (
@@ -284,8 +270,8 @@ export default function AddMeal() {
                 type="button"
                 onClick={() => setTab(item.value)}
                 className={cn(
-                  "flex items-center justify-center gap-2 rounded-[18px] px-3 py-2.5 text-xs font-semibold transition-colors",
-                  tab === item.value ? "bg-foreground text-white" : "bg-secondary/60 text-muted-foreground hover:text-foreground",
+                  "flex h-10 items-center justify-center gap-1.5 rounded-2xl px-2 text-xs font-semibold transition-colors",
+                  tab === item.value ? "bg-primary text-primary-foreground shadow-[var(--shadow-button)]" : "bg-surface-elevated/70 text-muted-foreground hover:text-foreground",
                 )}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -293,22 +279,8 @@ export default function AddMeal() {
               </button>
             ))}
           </div>
-
-          {uiMode === "advanced" ? (
-            <div className="rounded-[20px] border border-primary/10 bg-primary/[0.05] px-4 py-3 text-sm text-muted-foreground">
-              Live search uses your backend and Open Food Facts together. The default tabs stay lightweight for everyday logging.
-            </div>
-          ) : null}
         </form>
       </SectionCard>
-
-      {!isBackendReady ? (
-        <SectionCard eyebrow="Backend" title="Logging needs the backend" description={backendError ?? "The app could not reach the backend yet."}>
-          <div className="rounded-[22px] bg-secondary/35 px-4 py-4 text-sm text-muted-foreground">
-            You can still browse starter foods below, but logging and favourites start working as soon as the backend is running.
-          </div>
-        </SectionCard>
-      ) : null}
 
       <SectionCard
         eyebrow="Foods"
@@ -321,11 +293,10 @@ export default function AddMeal() {
                 ? `${results.length} live matches`
                 : `${results.length} quick picks`
         }
-        description={liveSearchActive ? "Live results from your backend and open food data." : "Start with foods you use most often."}
       >
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {searchQuery.isError ? (
-            <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+            <div className="rounded-[22px] border border-destructive/25 bg-destructive/10 px-4 py-4 text-sm text-destructive">
               {searchQuery.error instanceof Error ? searchQuery.error.message : "Food search is unavailable right now."}
             </div>
           ) : null}
@@ -344,20 +315,20 @@ export default function AddMeal() {
                 setPortion([1]);
               }}
               className={cn(
-                "w-full rounded-[24px] border p-4 text-left transition-all",
-                selectedFood?.id === food.id ? "border-primary bg-primary/[0.05]" : "border-white/85 bg-secondary/20 hover:bg-secondary/35",
+                "w-full rounded-[22px] border p-3.5 text-left transition-all",
+                selectedFood?.id === food.id ? "border-primary bg-primary/10" : "border-border/80 bg-surface-elevated/35 hover:bg-surface-elevated/55",
               )}
             >
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-sm font-semibold text-primary shadow-sm">
-                  {Math.round(food.protein)}P
+              <div className="flex items-start gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-sm font-semibold text-primary">
+                  {food.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-foreground">{food.name}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {food.servingSize} / {food.brand ?? food.sourceLabel}
+                        {food.servingSize} / {Math.round(food.calories)} kcal / {food.brand ?? food.sourceLabel}
                       </p>
                     </div>
                     <button
@@ -365,23 +336,22 @@ export default function AddMeal() {
                         event.stopPropagation();
                         favouriteMutation.mutate(food);
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-white"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
                       aria-label={`Toggle favourite for ${food.name}`}
                     >
                       <Heart className={cn("h-4 w-4", favouriteKeys.has(foodMatchKey(food)) && "fill-primary text-primary")} />
                     </button>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium text-muted-foreground">
-                    <span className="rounded-full bg-white px-2.5 py-1">{Math.round(food.calories)} kcal</span>
-                    <span className="rounded-full bg-white px-2.5 py-1">{Math.round(food.protein)}g protein</span>
-                    {uiMode === "advanced" ? <span className="rounded-full bg-white px-2.5 py-1">{food.sourceLabel}</span> : null}
+                  <div className={cn("mt-3 flex flex-wrap gap-2 text-xs font-medium text-muted-foreground", uiMode !== "advanced" && "hidden")}>
+                    {uiMode === "advanced" ? <span className="rounded-full bg-protein/15 px-2.5 py-1 text-protein">{Math.round(food.protein)}g protein</span> : null}
+                    {uiMode === "advanced" ? <span className="rounded-full bg-surface-elevated/80 px-2.5 py-1">{food.sourceLabel}</span> : null}
                   </div>
                 </div>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     if (!isBackendReady) {
-                      toast.error("Start the backend before logging food.");
+                      toast.error("Food logging is still getting ready. Try again in a moment.");
                       return;
                     }
                     createMealMutation.mutate({ food, quantity: 1 });
@@ -398,12 +368,12 @@ export default function AddMeal() {
       </SectionCard>
 
       {selectedFood ? (
-        <div className="absolute inset-x-4 bottom-24 rounded-[28px] border border-white/85 bg-background/96 p-4 shadow-[0_34px_60px_-36px_rgba(0,0,0,0.3)] backdrop-blur-xl">
+        <div className="absolute inset-x-4 bottom-24 rounded-[28px] border border-border/80 bg-card/95 p-4 shadow-[0_34px_60px_-36px_rgb(0_0_0/0.72)] backdrop-blur-xl">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-primary/60">Portion</p>
-              <h2 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">{selectedFood.name}</h2>
-              <p className="mt-2 text-sm text-muted-foreground">Adjust the serving, then log it to {MEAL_LABELS[selectedMeal].toLowerCase()}.</p>
+              <h2 className="display-font mt-1 text-xl font-bold text-foreground">{selectedFood.name}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Adjust serving.</p>
             </div>
             <button
               onClick={() => setSelectedFood(null)}
@@ -413,7 +383,7 @@ export default function AddMeal() {
             </button>
           </div>
 
-          <div className="mt-4 rounded-[22px] bg-secondary/55 p-4">
+          <div className="mt-4 rounded-[22px] border border-border/70 bg-surface-elevated/55 p-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-semibold text-foreground">Serving multiplier</span>
               <span className="display-font text-lg font-bold text-foreground">{portion[0].toFixed(2)}x</span>
@@ -429,7 +399,7 @@ export default function AddMeal() {
           <button
             onClick={() => {
               if (!isBackendReady) {
-                toast.error("Start the backend before logging food.");
+                toast.error("Food logging is still getting ready. Try again in a moment.");
                 return;
               }
 
@@ -437,10 +407,9 @@ export default function AddMeal() {
               setSelectedFood(null);
             }}
             disabled={createMealMutation.isPending}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)))] px-4 py-3.5 text-sm font-semibold text-white shadow-[0_22px_36px_-24px_hsl(var(--primary)/0.75)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--primary-soft)))] px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-button)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Sparkles className="h-4 w-4" />
-            Log to {MEAL_LABELS[selectedMeal]}
+            Log food
           </button>
         </div>
       ) : null}

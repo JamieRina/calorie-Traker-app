@@ -66,7 +66,7 @@ npm install
 docker compose up -d
 ```
 
-If Docker is not available on your Windows machine yet, you can still run the app in file-backed local mode by setting `LOCAL_BACKEND_MODE=force_local` in `.env`. That lets `npm run dev` work without PostgreSQL or Redis for day-to-day development.
+The default worker setup now uses file-backed local mode with `LOCAL_BACKEND_MODE=force_local` in `.env`. That lets `npm run dev` work without PostgreSQL, Redis, Docker, or SQL Server Express for day-to-day development.
 
 ### 3) Configure environment variables
 
@@ -74,7 +74,11 @@ If Docker is not available on your Windows machine yet, you can still run the ap
 cp .env.example .env
 ```
 
-Then fill in the secrets and optional external API keys.
+Then fill in the secrets and optional external API keys. For USDA live food search, paste your key here:
+
+```env
+USDA_API_KEY=YOUR_USDA_API_KEY_HERE  # PASTE YOUR USDA API KEY HERE
+```
 
 For local work, the backend now has sensible development defaults for PostgreSQL, Redis, JWT secrets, and common Vite frontend origins (`localhost:8080` and `localhost:8081`). Production still requires explicit non-default secrets and infrastructure URLs.
 
@@ -116,6 +120,7 @@ npm run worker:reminders
 - `POST /api/v1/profile/goal`
 - `GET /api/v1/foods/search?q=chicken`
 - `GET /api/v1/foods/barcode/:barcode`
+- `GET /api/v1/foods/usda/:fdcId`
 - `POST /api/v1/foods/favourites`
 - `GET /api/v1/foods/favourites`
 - `GET /api/v1/foods/recent`

@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Gauge, RefreshCw, Settings2, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
-import { AppPage, MetricCard, PageHeader, SectionCard } from "@/components/app/AppPage";
+import { Gauge, LogOut, Moon, SlidersHorizontal, Sun, UserRound } from "lucide-react";
+import { AppPage, PageHeader, SectionCard } from "@/components/app/AppPage";
+import { useAuth } from "@/context/AuthContext";
 import { getProfileSummary } from "@/lib/api";
 import { useApp } from "@/context/AppContext";
 
 export default function Settings() {
-  const { uiMode, setUiMode, isBackendReady, isBootstrapping, backendError, retryBackendConnection } = useApp();
+  const { uiMode, setUiMode, themeMode, resolvedTheme, setThemeMode, isBackendReady } = useApp();
+  const { logout, isAuthBusy, accountName } = useAuth();
 
   const profileQuery = useQuery({
     queryKey: ["profile"],
@@ -20,77 +22,74 @@ export default function Settings() {
     <AppPage>
       <PageHeader
         eyebrow="Settings"
-        title="Simple by default"
-        description="The lighter interface stays on by default. Advanced mode adds detail without crowding the main screens."
+        title="Settings"
+        action={
+          <button
+            onClick={logout}
+            disabled={isAuthBusy}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border/80 bg-card/90 text-foreground shadow-[var(--shadow-card)] disabled:opacity-50"
+            aria-label="Log out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        }
       />
 
-      <SectionCard
-        variant="hero"
-        eyebrow="Mode"
-        title={uiMode === "advanced" ? "Advanced mode is on" : "Simple mode is on"}
-        description={uiMode === "advanced" ? "Extra detail appears across the app." : "Home, activity, and progress stay focused on the essentials."}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            {
-              mode: "simple" as const,
-              title: "Simple",
-              detail: "Best for quick daily logging.",
-              icon: SlidersHorizontal,
-            },
-            {
-              mode: "advanced" as const,
-              title: "Advanced",
-              detail: "Shows more analysis and extra sections.",
-              icon: Gauge,
-            },
-          ].map((option) => (
-            <button
-              key={option.mode}
-              onClick={() => setUiMode(option.mode)}
-              className={`rounded-[24px] border p-4 text-left transition-all ${
-                uiMode === option.mode ? "border-primary/15 bg-white/78 text-foreground" : "border-white/55 bg-white/54 text-foreground/85"
-              }`}
-            >
-              <option.icon className="h-4 w-4" />
-              <p className="mt-3 text-sm font-semibold">{option.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{option.detail}</p>
-            </button>
-          ))}
+      <SectionCard variant="hero" eyebrow="Display" title={`${uiMode === "advanced" ? "Advanced" : "Simple"} / ${resolvedTheme === "dark" ? "Dark" : "Light"}`}>
+        <div className="space-y-3">
+          <div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Mode</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { mode: "simple" as const, title: "Simple", icon: SlidersHorizontal },
+                { mode: "advanced" as const, title: "Advanced", icon: Gauge },
+              ].map((option) => (
+                <button
+                  key={option.mode}
+                  onClick={() => setUiMode(option.mode)}
+                  className={`flex h-12 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition-all ${
+                    uiMode === option.mode
+                      ? "border-primary bg-primary text-primary-foreground shadow-[var(--shadow-button)]"
+                      : "border-border/75 bg-card/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <option.icon className="h-4 w-4" />
+                  {option.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Theme</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { mode: "dark" as const, title: "Dark", icon: Moon },
+                { mode: "light" as const, title: "Light", icon: Sun },
+              ].map((option) => (
+                <button
+                  key={option.mode}
+                  onClick={() => setThemeMode(option.mode)}
+                  className={`flex h-12 items-center justify-center gap-2 rounded-2xl border text-sm font-semibold transition-all ${
+                    themeMode === option.mode
+                      ? "border-primary bg-primary text-primary-foreground shadow-[var(--shadow-button)]"
+                      : "border-border/75 bg-card/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <option.icon className="h-4 w-4" />
+                  {option.title}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </SectionCard>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <MetricCard icon={ShieldCheck} label="Backend" value={isBackendReady ? "Connected" : isBootstrapping ? "Loading" : "Offline"} detail={isBackendReady ? "Live meals, foods, and workouts enabled" : "Start the backend to sync data"} />
-        <MetricCard icon={Settings2} label="Interface" value={uiMode === "advanced" ? "Advanced" : "Simple"} detail="You can switch modes any time" tone="accent" />
-      </div>
-
-      {!isBackendReady ? (
-        <SectionCard
-          eyebrow="Connection"
-          title="Backend connection"
-          description={backendError ?? "The app could not reach the backend yet."}
-          action={
-            <button
-              onClick={retryBackendConnection}
-              className="flex items-center gap-2 rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry
-            </button>
-          }
-        >
-          <div className="rounded-[22px] bg-secondary/35 px-4 py-4 text-sm text-muted-foreground">
-            Run <span className="font-semibold text-foreground">npm run backend:dev</span> to bring the live data back.
-          </div>
-        </SectionCard>
-      ) : null}
 
       {profile ? (
         <SectionCard
           eyebrow="Account"
-          title={profile.name}
-          description={`${profile.goal} / ${profile.activityLevel} / ${profile.currentWeight.toFixed(1)} kg`}
+          title={accountName ?? profile.name}
+          description={`${profile.goal} / ${profile.currentWeight.toFixed(1)} kg`}
           action={
             <div className="flex h-12 w-12 items-center justify-center rounded-[20px] bg-secondary/50 text-primary">
               <UserRound className="h-6 w-6" />
@@ -111,7 +110,7 @@ export default function Settings() {
       ) : null}
 
       {uiMode === "advanced" && profile ? (
-        <SectionCard eyebrow="Advanced" title="Profile detail" description="Extra target and preference detail only appears when you choose advanced mode.">
+        <SectionCard eyebrow="Advanced" title="Targets">
           <div className="grid gap-3 sm:grid-cols-2">
             {[
               `Protein target: ${goal?.protein ?? 150} g`,
@@ -119,7 +118,7 @@ export default function Settings() {
               `Fat target: ${goal?.fat ?? 70} g`,
               `Fibre target: ${goal?.fiber ?? 30} g`,
             ].map((item) => (
-              <div key={item} className="rounded-[22px] border border-white/80 bg-secondary/25 px-4 py-3 text-sm font-medium text-foreground">
+              <div key={item} className="rounded-[22px] border border-border/80 bg-surface-elevated/35 px-4 py-3 text-sm font-medium text-foreground">
                 {item}
               </div>
             ))}

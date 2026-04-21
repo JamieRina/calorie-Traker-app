@@ -9,6 +9,7 @@ export const foodsRouter = Router();
 
 foodsRouter.get("/search", validateQuery(searchFoodsQuerySchema), asyncHandler(foodsController.search.bind(foodsController)));
 foodsRouter.get("/barcode/:barcode", asyncHandler(foodsController.barcodeLookup.bind(foodsController)));
+foodsRouter.get("/usda/:fdcId", asyncHandler(foodsController.usdaFoodDetail.bind(foodsController)));
 
 foodsRouter.use(requireAuth);
 foodsRouter.post("/import", validateBody(importFoodSchema), asyncHandler(foodsController.importFood.bind(foodsController)));

@@ -1,14 +1,7 @@
-import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { type DashboardMeal } from "@/lib/api";
 import { MealType, MEAL_LABELS } from "@/context/AppContext";
-
-const mealCopy: Record<MealType, string> = {
-  breakfast: "A simple start to the day.",
-  lunch: "One solid midday meal.",
-  dinner: "Keep dinner clear and balanced.",
-  snack: "Small extras when you need them.",
-};
 
 interface MealCardProps {
   mealType: MealType;
@@ -29,48 +22,45 @@ export function MealCard({ mealType, entries, onDelete, isMutating = false }: Me
   const totalCalories = entries.reduce((sum, item) => sum + item.totalCalories, 0);
 
   return (
-    <section className="rounded-[28px] border border-white/75 bg-white/88 p-4 shadow-[0_18px_36px_-30px_rgba(22,40,46,0.16)] backdrop-blur-sm">
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-[22px] border border-border/75 bg-card/90 p-3.5 shadow-[var(--shadow-card)] backdrop-blur-xl">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/60">{MEAL_LABELS[mealType]}</p>
-          <h3 className="display-font mt-1 text-xl font-bold tracking-tight text-foreground">
-            {entries.length === 0 ? "Nothing logged" : `${Math.round(totalCalories)} kcal`}
+          <p className="text-sm font-semibold text-foreground">{MEAL_LABELS[mealType]}</p>
+          <h3 className="display-font mt-1 text-lg font-bold text-foreground">
+            {Math.round(totalCalories)} kcal
           </h3>
-          <p className="mt-2 text-sm text-muted-foreground">{mealCopy[mealType]}</p>
+          {entries.length > 0 ? <p className="mt-0.5 text-xs text-muted-foreground">{entries.length} logged</p> : null}
         </div>
         <button
           onClick={() => navigate(`/add?meal=${mealType}`)}
-          className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_18px_28px_-22px_hsl(var(--primary)/0.45)] transition-transform active:scale-95"
+          className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[var(--shadow-button)] transition-transform active:scale-95"
           aria-label={`Add to ${MEAL_LABELS[mealType]}`}
         >
-          <Plus className="h-5 w-5" />
+          <Plus className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-3 space-y-2">
         {entries.length === 0 ? (
           <button
             onClick={() => navigate(`/add?meal=${mealType}`)}
-            className="flex w-full items-center justify-between rounded-[22px] border border-dashed border-primary/20 bg-secondary/30 px-4 py-4 text-left transition-colors hover:border-primary/35 hover:bg-secondary/42"
+            className="flex w-full items-center justify-between rounded-[18px] border border-dashed border-primary/25 bg-secondary/20 px-3.5 py-3 text-left transition-colors hover:border-primary/45 hover:bg-secondary/35"
           >
             <div>
               <p className="text-sm font-semibold text-foreground">Add food</p>
-              <p className="mt-1 text-sm text-muted-foreground">Search, pick, and log in one step.</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Search and log.</p>
             </div>
-            <ArrowRight className="h-4 w-4 text-primary" />
+            <Plus className="h-4 w-4 text-primary" />
           </button>
         ) : (
           entries.map((entry) => (
-            <div key={entry.id} className="flex items-center gap-3 rounded-[22px] border border-white/75 bg-secondary/22 px-4 py-3">
-              <div className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-white text-sm font-semibold text-primary shadow-sm">
-                {Math.round(entry.totalProtein)}P
-              </div>
+            <div key={entry.id} className="flex items-center gap-3 rounded-[18px] bg-surface-elevated/35 px-3.5 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">
                   {entry.itemCount === 1 ? entry.itemNames[0] : `${entry.itemCount} foods`}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {formatTime(entry.consumedAt)} / {entry.itemNames.slice(0, 2).join(", ")} / {Math.round(entry.totalCalories)} kcal
+                  {formatTime(entry.consumedAt)} / {Math.round(entry.totalCalories)} kcal
                 </p>
               </div>
               <button

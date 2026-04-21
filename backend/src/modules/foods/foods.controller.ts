@@ -15,6 +15,11 @@ export class FoodsController {
     response.json(result);
   }
 
+  async usdaFoodDetail(request: Request, response: Response) {
+    const result = await foodsService.getUsdaFoodDetail(String(request.params.fdcId));
+    response.json(result);
+  }
+
   async addFavourite(request: AuthenticatedRequest, response: Response) {
     const result = await foodsService.addFavourite(request.user!.sub, request.body.foodId, request.body.recipeId);
     response.status(201).json(result);

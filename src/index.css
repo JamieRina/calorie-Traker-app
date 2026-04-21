@@ -6,80 +6,121 @@
 
 @layer base {
   :root {
-    --background: 186 38% 97%;
-    --foreground: 205 34% 16%;
+    --background: 210 40% 98%;
+    --background-secondary: 208 100% 97%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 205 34% 16%;
+    --card-foreground: 222 47% 11%;
+    --surface: 0 0% 100%;
+    --surface-elevated: 210 40% 96%;
+    --surface-success: 138 76% 92%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 205 34% 16%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 157 56% 38%;
+    --primary: 160 84% 39%;
+    --primary-pressed: 161 94% 30%;
+    --primary-soft: 156 72% 67%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 178 33% 92%;
-    --secondary-foreground: 205 30% 20%;
+    --secondary: 214 95% 93%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 192 28% 92%;
-    --muted-foreground: 205 14% 41%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 201 72% 48%;
+    --accent: 198 93% 60%;
     --accent-foreground: 0 0% 100%;
+    --hydration: 198 93% 60%;
+    --carbs: 43 96% 56%;
+    --protein: 255 92% 76%;
+    --fat: 351 95% 72%;
 
-    --destructive: 0 72% 52%;
+    --destructive: 351 89% 64%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 188 25% 84%;
-    --input: 188 25% 84%;
-    --ring: 157 56% 38%;
+    --border: 214 95% 93%;
+    --input: 214 75% 90%;
+    --ring: 160 84% 39%;
 
-    --radius: 1.4rem;
+    --radius: 1.5rem;
 
-    --chart-1: 157 56% 38%;
-    --chart-2: 201 72% 48%;
-    --chart-3: 185 58% 44%;
-    --chart-4: 214 70% 54%;
-    --chart-5: 170 40% 45%;
+    --chart-1: 160 84% 39%;
+    --chart-2: 198 93% 60%;
+    --chart-3: 43 96% 56%;
+    --chart-4: 255 92% 76%;
+    --chart-5: 351 95% 72%;
+    --success-glow: 16 185 129 / 0.1;
+    --shadow-card: 0 24px 52px -38px rgb(15 23 42 / 0.18);
+    --shadow-button: 0 20px 36px -24px rgb(16 185 129 / 0.48);
+    --app-background:
+      radial-gradient(circle at top left, rgb(16 185 129 / 0.14), transparent 24%),
+      radial-gradient(circle at top right, rgb(56 189 248 / 0.12), transparent 30%),
+      linear-gradient(180deg, hsl(var(--background-secondary)), hsl(var(--background)) 52%, hsl(210 40% 96%));
 
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 205 34% 16%;
-    --sidebar-primary: 157 56% 38%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 160 84% 39%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 178 33% 92%;
-    --sidebar-accent-foreground: 205 34% 16%;
-    --sidebar-border: 188 25% 84%;
-    --sidebar-ring: 157 56% 38%;
+    --sidebar-accent: 214 95% 93%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 95% 93%;
+    --sidebar-ring: 160 84% 39%;
   }
 
   .dark {
-    --background: 205 32% 10%;
-    --foreground: 186 24% 94%;
+    --background: 222 84% 5%;
+    --background-secondary: 213 68% 7%;
+    --foreground: 210 40% 98%;
 
-    --card: 204 24% 14%;
-    --card-foreground: 186 24% 94%;
+    --card: 222 49% 8%;
+    --card-foreground: 210 40% 98%;
+    --surface: 222 49% 8%;
+    --surface-elevated: 220 26% 14%;
+    --surface-success: 164 86% 16%;
 
-    --popover: 204 24% 14%;
-    --popover-foreground: 186 24% 94%;
+    --popover: 222 49% 8%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 158 52% 48%;
+    --primary: 160 84% 39%;
+    --primary-pressed: 161 94% 30%;
+    --primary-soft: 158 64% 52%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 198 20% 18%;
-    --secondary-foreground: 186 24% 90%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 198 20% 18%;
-    --muted-foreground: 188 10% 66%;
+    --muted: 220 26% 14%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 201 70% 50%;
+    --accent: 217 91% 60%;
     --accent-foreground: 0 0% 100%;
+    --hydration: 217 91% 60%;
+    --carbs: 38 92% 50%;
+    --protein: 258 90% 66%;
+    --fat: 349 89% 60%;
 
-    --destructive: 0 62% 38%;
+    --destructive: 349 89% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 201 18% 22%;
-    --input: 201 18% 22%;
-    --ring: 158 52% 48%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 160 84% 39%;
+
+    --chart-1: 160 84% 39%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 258 90% 66%;
+    --chart-5: 349 89% 60%;
+    --success-glow: 16 185 129 / 0.18;
+    --shadow-card: 0 28px 58px -36px rgb(0 0 0 / 0.62);
+    --shadow-button: 0 22px 38px -24px rgb(16 185 129 / 0.72);
+    --app-background:
+      radial-gradient(circle at top left, rgb(16 185 129 / 0.16), transparent 26%),
+      radial-gradient(circle at top right, rgb(59 130 246 / 0.12), transparent 32%),
+      radial-gradient(circle at bottom center, rgb(139 92 246 / 0.08), transparent 36%),
+      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background-secondary)) 50%, hsl(222 84% 4%));
   }
 }
 
@@ -101,11 +142,7 @@
     -moz-osx-font-smoothing: grayscale;
     overscroll-behavior: none;
     overflow: hidden;
-    background-image:
-      radial-gradient(circle at top left, hsl(var(--primary) / 0.16), transparent 24%),
-      radial-gradient(circle at top right, hsl(var(--accent) / 0.14), transparent 28%),
-      radial-gradient(circle at bottom center, hsl(var(--secondary-foreground) / 0.06), transparent 32%),
-      linear-gradient(180deg, hsl(184 65% 99%), hsl(var(--background)) 54%, hsl(191 42% 95%));
+    background-image: var(--app-background);
   }
 
   #root {
@@ -118,7 +155,7 @@
   h4,
   .display-font {
     font-family: "Space Grotesk", sans-serif;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
   }
 
   button,
@@ -149,5 +186,40 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  .app-card {
+    border: 1px solid hsl(var(--border) / 0.8);
+    background: hsl(var(--card) / 0.9);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(24px);
+  }
+
+  .app-card-soft {
+    border: 1px solid hsl(var(--primary) / 0.15);
+    background: hsl(var(--secondary) / 0.35);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(24px);
+  }
+
+  .app-chip {
+    border: 1px solid hsl(var(--border) / 0.8);
+    border-radius: 999px;
+    background: hsl(var(--surface-elevated) / 0.8);
+    color: hsl(var(--foreground));
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .app-primary-button {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: var(--shadow-button);
+    transition: transform 160ms ease, background-color 160ms ease;
+  }
+
+  .app-primary-button:active {
+    transform: scale(0.98);
   }
 }

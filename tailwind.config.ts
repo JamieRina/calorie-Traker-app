@@ -22,9 +22,17 @@ export default {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
+        "background-secondary": "hsl(var(--background-secondary))",
         foreground: "hsl(var(--foreground))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          elevated: "hsl(var(--surface-elevated))",
+          success: "hsl(var(--surface-success))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
+          pressed: "hsl(var(--primary-pressed))",
+          soft: "hsl(var(--primary-soft))",
           foreground: "hsl(var(--primary-foreground))",
         },
         secondary: {
@@ -43,6 +51,10 @@ export default {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
+        hydration: "hsl(var(--hydration))",
+        carbs: "hsl(var(--carbs))",
+        protein: "hsl(var(--protein))",
+        fat: "hsl(var(--fat))",
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
@@ -52,12 +64,12 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         cal: {
-          green: "hsl(var(--chart-5))",
-          orange: "hsl(var(--chart-3))",
+          green: "hsl(var(--chart-1))",
+          orange: "hsl(var(--carbs))",
           red: "hsl(var(--destructive))",
-          blue: "hsl(var(--chart-2))",
-          purple: "hsl(var(--chart-4))",
-          pink: "hsl(var(--accent))",
+          blue: "hsl(var(--hydration))",
+          purple: "hsl(var(--protein))",
+          pink: "hsl(var(--fat))",
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
