@@ -1,7 +1,7 @@
 import type { DailyGoal, Food, MealType, Nutrients, UserProfile } from "@/context/AppContext";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000/api/v1";
-const SESSION_STORAGE_KEY = "nutritrack-session";
+const SESSION_STORAGE_KEY = "bitebalance-session";
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
 const ALL_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 

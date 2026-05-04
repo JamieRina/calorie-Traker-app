@@ -73,7 +73,7 @@ app.get("/", (_request, response) => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>NutriTrack API</title>
+        <title>BiteBalance API</title>
         <style>
           body {
             margin: 0;
@@ -108,7 +108,7 @@ app.get("/", (_request, response) => {
       <body>
         <main>
           <div class="card">
-            <p><strong>NutriTrack backend API</strong></p>
+            <p><strong>BiteBalance backend API</strong></p>
             <h1>This port is the backend</h1>
             <p>Open the website at <a href="${env.PRIMARY_APP_ORIGIN}" target="_blank" rel="noreferrer">${env.PRIMARY_APP_ORIGIN}</a>.</p>
             <p>API health check: <code>/health</code></p>

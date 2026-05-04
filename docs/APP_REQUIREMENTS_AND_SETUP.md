@@ -1,4 +1,4 @@
-# NutriTrack Pro Product And Setup Blueprint
+# BiteBalance Product And Setup Blueprint
 
 ## 1. Analyse User Needs and Project Goals
 

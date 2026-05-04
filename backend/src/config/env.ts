@@ -24,7 +24,7 @@ const defaults = {
   OPENAI_MODEL: "gpt-4.1-mini",
   USDA_BASE_URL: "https://api.nal.usda.gov/fdc/v1",
   OPEN_FOOD_FACTS_BASE_URL: "https://world.openfoodfacts.org",
-  OPEN_FOOD_FACTS_USER_AGENT: "NutriTrackPro/0.1 (replace-with-your-email@example.com)",
+  OPEN_FOOD_FACTS_USER_AGENT: "BiteBalance/0.1 (replace-with-your-email@example.com)",
   REMINDER_QUEUE_NAME: "reminders",
   LOG_LEVEL: "info"
 } as const;
@@ -45,7 +45,7 @@ const envSchema = z.object({
   USDA_API_KEY: z.string().optional(),
   USDA_BASE_URL: z.string().url().default("https://api.nal.usda.gov/fdc/v1"),
   OPEN_FOOD_FACTS_BASE_URL: z.string().default("https://world.openfoodfacts.org"),
-  OPEN_FOOD_FACTS_USER_AGENT: z.string().min(1).default("NutriTrackPro/0.1 (replace-with-your-email@example.com)"),
+  OPEN_FOOD_FACTS_USER_AGENT: z.string().min(1).default("BiteBalance/0.1 (replace-with-your-email@example.com)"),
   REMINDER_QUEUE_NAME: z.string().default("reminders"),
   LOG_LEVEL: z.string().default("info")
 });

@@ -92,8 +92,8 @@ interface AppContextType {
   rememberFoods: (foods: Food[]) => void;
 }
 
-const UI_MODE_STORAGE_KEY = "nutritrack-ui-mode";
-const THEME_MODE_STORAGE_KEY = "nutritrack-theme-mode";
+const UI_MODE_STORAGE_KEY = "bitebalance-ui-mode";
+const THEME_MODE_STORAGE_KEY = "bitebalance-theme-mode";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
