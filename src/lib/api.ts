@@ -787,6 +787,7 @@ export async function createWorkoutEntry(input: {
   caloriesBurned: number;
   durationMinutes: number;
   performedAt: string;
+  notes?: string;
 }) {
   const payload = await authedRequest<ApiWorkout>("/workouts", {
     method: "POST",
@@ -795,6 +796,7 @@ export async function createWorkoutEntry(input: {
       caloriesBurned: input.caloriesBurned,
       durationMin: input.durationMinutes,
       performedAt: input.performedAt,
+      notes: input.notes,
     }),
   });
 
