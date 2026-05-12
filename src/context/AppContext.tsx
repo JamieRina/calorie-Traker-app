@@ -92,8 +92,8 @@ interface AppContextType {
   rememberFoods: (foods: Food[]) => void;
 }
 
-const UI_MODE_STORAGE_KEY = "nutritrack-ui-mode";
-const THEME_MODE_STORAGE_KEY = "nutritrack-theme-mode";
+const UI_MODE_STORAGE_KEY = "bitebalance-ui-mode";
+const THEME_MODE_STORAGE_KEY = "bitebalance-theme-mode";
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
@@ -157,10 +157,6 @@ export const WORKOUT_PRESETS: Array<Omit<WorkoutLog, "id" | "loggedAt">> = [
   { type: "Incline walk", durationMinutes: 25, caloriesBurned: 180, intensity: "Low" },
   { type: "Tempo run", durationMinutes: 35, caloriesBurned: 320, intensity: "High" },
   { type: "Mobility and core", durationMinutes: 20, caloriesBurned: 95, intensity: "Low" },
-  { type: "Cycling session", durationMinutes: 40, caloriesBurned: 360, intensity: "Moderate" },
-  { type: "HIIT intervals", durationMinutes: 20, caloriesBurned: 240, intensity: "High" },
-  { type: "Yoga flow", durationMinutes: 30, caloriesBurned: 120, intensity: "Low" },
-  { type: "Weight lifting", durationMinutes: 40, caloriesBurned: 250, intensity: "Moderate" },
 ];
 
 export const ROUTE_LIBRARY: RouteRecommendation[] = [

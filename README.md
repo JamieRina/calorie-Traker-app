@@ -1,6 +1,6 @@
-# NutriTrack Pro
+# BiteBalance
 
-Mobile-first calorie tracker with a React/Vite frontend and an Express backend. The app now starts with real sign-up and login, stores accounts and meal data, and has a one-command Windows workflow for workers.
+Mobile-first nutrition tracker with a React/Vite frontend and an Express backend. The app now starts with real sign-up and login, stores accounts and meal data, and has a one-command Windows workflow for workers.
 
 ## One-command start
 

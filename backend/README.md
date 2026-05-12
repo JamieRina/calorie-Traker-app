@@ -1,6 +1,6 @@
-# Calorie Tracker Backend Starter
+# BiteBalance Backend
 
-A production-minded backend starter for a calorie tracker app that matches your uploaded brief: Node.js + Express, PostgreSQL, Redis, AI recipe parsing, reminders, analytics, offline sync support, favourites, workouts, and influencer/community surfaces.
+A production-minded backend for BiteBalance: Node.js + Express, PostgreSQL, Redis, AI recipe parsing, reminders, analytics, offline sync support, favourites, workouts, and influencer/community surfaces.
 
 ## What this backend includes
 
@@ -20,7 +20,7 @@ A production-minded backend starter for a calorie tracker app that matches your 
 ## Project structure
 
 ```text
-calorie-tracker-backend/
+bitebalance-backend/
 |-- prisma/
 |   |-- schema.prisma
 |   `-- seed.ts

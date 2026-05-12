@@ -127,7 +127,7 @@ export default function Auth() {
           </div>
         </div>
 
-        <SectionCard variant="hero" eyebrow="NutriTrack Pro" title={headline} description="Fast meal logging, clear goals, and progress that stays easy to read.">
+        <SectionCard variant="hero" eyebrow="BiteBalance" title={headline} description="Fast meal logging, clear goals, and progress that stays easy to read.">
           <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border/70 bg-surface-elevated/55 p-1">
             {[
               { value: "login" as const, label: "Log in" },

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Heart, History, LoaderCircle, Plus, Search, SearchCode, Star } from "lucide-react";
+import { FormEvent, startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Heart, History, LoaderCircle, Plus, Search, SearchCode, Star, Trash2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { AppPage, PageHeader, SectionCard } from "@/components/app/AppPage";
@@ -8,6 +8,22 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { FOOD_DATABASE, Food, MealType, MEAL_LABELS, useApp } from "@/context/AppContext";
 import { createMealLog, listFavouriteFoods, listRecentFoods, searchFoods, setFavouriteFood, type SearchFood } from "@/lib/api";
+import {
+  addManualFoodLog,
+  createManualFoodLog,
+  createManualSavedFood,
+  hasManualFoodLogDuplicate,
+  type ManualFoodLog,
+  type ManualSavedFood,
+  parseManualCalories,
+  parseManualOptionalNumber,
+  readManualFoodLogs,
+  readManualSavedFoods,
+  removeManualSavedFoodById,
+  upsertManualSavedFood,
+  writeManualFoodLogs,
+  writeManualSavedFoods,
+} from "@/lib/manual-food-logs";
 import { cn } from "@/lib/utils";
 
 const SEARCH_MIN_LENGTH = 2;
@@ -59,6 +75,18 @@ export default function AddMeal() {
   const [search, setSearch] = useState("");
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [tab, setTab] = useState<Tab>("recent");
+  const [manualFoodName, setManualFoodName] = useState("");
+  const [manualAmount, setManualAmount] = useState("");
+  const [manualGrams, setManualGrams] = useState("");
+  const [manualCalories, setManualCalories] = useState("");
+  const [manualProtein, setManualProtein] = useState("");
+  const [manualCarbs, setManualCarbs] = useState("");
+  const [manualFat, setManualFat] = useState("");
+  const [manualFiber, setManualFiber] = useState("");
+  const [manualFoodLogs, setManualFoodLogs] = useState<ManualFoodLog[]>(() => readManualFoodLogs());
+  const [manualSavedFoods, setManualSavedFoods] = useState<ManualSavedFood[]>(() => readManualSavedFoods());
+  const manualFoodLogsRef = useRef(manualFoodLogs);
+  const manualSavedFoodsRef = useRef(manualSavedFoods);
   const [selectedFood, setSelectedFood] = useState<SearchFood | null>(null);
   const [portion, setPortion] = useState([1]);
   const [selectedMeal, setSelectedMeal] = useState<MealType>(() => {
@@ -73,6 +101,14 @@ export default function AddMeal() {
       setSelectedMeal(requestedMeal);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    manualFoodLogsRef.current = manualFoodLogs;
+  }, [manualFoodLogs]);
+
+  useEffect(() => {
+    manualSavedFoodsRef.current = manualSavedFoods;
+  }, [manualSavedFoods]);
 
   useEffect(() => {
     const nextSearch = deferredSearch.trim();
@@ -188,6 +224,116 @@ export default function AddMeal() {
   const liveSearchActive = deferredSearch.trim().length >= SEARCH_MIN_LENGTH;
   const results = liveSearchActive ? liveFoods : browsingFoods;
   const favouriteKeys = new Set(favouriteFoods.map(foodMatchKey));
+  const canAddManualFood = manualFoodName.trim().length > 0;
+
+  const saveManualFoodLog = (log: ManualFoodLog) => {
+    const currentLogs = manualFoodLogsRef.current;
+    const nextLogs = addManualFoodLog(currentLogs, log);
+    manualFoodLogsRef.current = nextLogs;
+    setManualFoodLogs(nextLogs);
+    writeManualFoodLogs(nextLogs);
+  };
+
+  const saveManualSavedFood = (food: ManualSavedFood) => {
+    const nextFoods = upsertManualSavedFood(manualSavedFoodsRef.current, food);
+    manualSavedFoodsRef.current = nextFoods;
+    setManualSavedFoods(nextFoods);
+    writeManualSavedFoods(nextFoods);
+  };
+
+  const removeManualSavedFood = (food: ManualSavedFood) => {
+    const nextFoods = removeManualSavedFoodById(manualSavedFoodsRef.current, food.id);
+    manualSavedFoodsRef.current = nextFoods;
+    setManualSavedFoods(nextFoods);
+    writeManualSavedFoods(nextFoods);
+    toast.success(`${food.foodName} removed from saved foods.`);
+  };
+
+  const handleManualEntrySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const foodName = manualFoodName.trim();
+
+    if (!foodName) {
+      return;
+    }
+
+    const { calories, isValid } = parseManualCalories(manualCalories);
+    if (!isValid) {
+      toast.error("Calories must be a positive number.");
+      return;
+    }
+
+    const gramsResult = parseManualOptionalNumber(manualGrams);
+    const proteinResult = parseManualOptionalNumber(manualProtein);
+    const carbsResult = parseManualOptionalNumber(manualCarbs);
+    const fatResult = parseManualOptionalNumber(manualFat);
+    const fiberResult = parseManualOptionalNumber(manualFiber);
+
+    if (!gramsResult.isValid || !proteinResult.isValid || !carbsResult.isValid || !fatResult.isValid || !fiberResult.isValid) {
+      toast.error("Nutrition values must be positive numbers.");
+      return;
+    }
+
+    const log = createManualFoodLog({
+      foodName,
+      amount: manualAmount.trim(),
+      grams: gramsResult.value,
+      calories,
+      protein: uiMode === "advanced" ? proteinResult.value : null,
+      carbs: uiMode === "advanced" ? carbsResult.value : null,
+      fat: uiMode === "advanced" ? fatResult.value : null,
+      fiber: uiMode === "advanced" ? fiberResult.value : null,
+      meal: selectedMeal,
+      date: currentDate,
+    });
+
+    if (hasManualFoodLogDuplicate(manualFoodLogsRef.current, log)) {
+      toast.info(`${log.foodName} is already logged for ${MEAL_LABELS[log.meal]}. Use the saved + button to add another.`);
+      return;
+    }
+
+    saveManualFoodLog(log);
+    saveManualSavedFood(
+      createManualSavedFood({
+        foodName: log.foodName,
+        amount: log.amount,
+        grams: log.grams,
+        calories: log.calories,
+        protein: log.protein,
+        carbs: log.carbs,
+        fat: log.fat,
+        fiber: log.fiber,
+      }),
+    );
+    setManualFoodName("");
+    setManualAmount("");
+    setManualGrams("");
+    setManualCalories("");
+    setManualProtein("");
+    setManualCarbs("");
+    setManualFat("");
+    setManualFiber("");
+    toast.success(`${log.foodName} added to ${MEAL_LABELS[log.meal]}.`);
+  };
+
+  const handleManualRecentAdd = (food: ManualSavedFood) => {
+    const nextLog = createManualFoodLog({
+      foodName: food.foodName,
+      amount: food.amount,
+      grams: food.grams,
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fat: food.fat,
+      fiber: food.fiber,
+      meal: selectedMeal,
+      date: currentDate,
+    });
+
+    saveManualFoodLog(nextLog);
+    saveManualSavedFood(food);
+    toast.success(`${nextLog.foodName} added to ${MEAL_LABELS[nextLog.meal]}.`);
+  };
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -281,6 +427,127 @@ export default function AddMeal() {
           </div>
         </form>
       </SectionCard>
+
+      <SectionCard eyebrow="Quick add" title="Manual entry" variant="soft">
+        <form onSubmit={handleManualEntrySubmit} className="space-y-3">
+          <Input
+            value={manualFoodName}
+            onChange={(event) => setManualFoodName(event.target.value)}
+            placeholder="Food name"
+            className="h-11 border-border/80 bg-card/75"
+          />
+          <div className="grid grid-cols-[76px_88px_minmax(0,1fr)] gap-2">
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={manualAmount}
+              onChange={(event) => setManualAmount(event.target.value)}
+              placeholder="Amount"
+              className="h-11 border-border/80 bg-card/75 px-2"
+            />
+            <Input
+              value={manualGrams}
+              onChange={(event) => setManualGrams(event.target.value)}
+              placeholder="Grams"
+              inputMode="decimal"
+              className="h-11 border-border/80 bg-card/75 px-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <Input
+              value={manualCalories}
+              onChange={(event) => setManualCalories(event.target.value)}
+              placeholder="Calories"
+              inputMode="decimal"
+              className="h-11 border-border/80 bg-card/75 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </div>
+          {uiMode === "advanced" ? (
+            <div className="grid grid-cols-4 gap-2">
+              <Input
+                value={manualProtein}
+                onChange={(event) => setManualProtein(event.target.value)}
+                placeholder="Protein"
+                inputMode="decimal"
+                className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <Input
+                value={manualCarbs}
+                onChange={(event) => setManualCarbs(event.target.value)}
+                placeholder="Carbs"
+                inputMode="decimal"
+                className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <Input
+                value={manualFat}
+                onChange={(event) => setManualFat(event.target.value)}
+                placeholder="Fat"
+                inputMode="decimal"
+                className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <Input
+                value={manualFiber}
+                onChange={(event) => setManualFiber(event.target.value)}
+                placeholder="Fibre"
+                inputMode="decimal"
+                className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            </div>
+          ) : null}
+          <button
+            type="submit"
+            disabled={!canAddManualFood}
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-button)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Plus className="h-4 w-4" />
+            Add food
+          </button>
+        </form>
+      </SectionCard>
+
+      {manualSavedFoods.length > 0 ? (
+        <SectionCard
+          eyebrow="Saved"
+          title="Manual foods"
+          action={<span className="text-[11px] font-semibold text-muted-foreground">{manualSavedFoods.length}/10 saved</span>}
+        >
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {manualSavedFoods.map((log) => (
+              <div
+                key={log.id}
+                className="flex min-w-[166px] items-center gap-2 rounded-2xl border border-border/80 bg-card/65 px-3 py-2.5 transition-colors hover:border-primary/50 hover:bg-card/90"
+              >
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-sm font-semibold text-foreground">{log.foodName}</p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {[log.amount || "Quick add", log.grams !== null ? `${Math.round(log.grams)}g` : null, log.calories !== null ? `${Math.round(log.calories)} kcal` : null]
+                      .filter(Boolean)
+                      .join(" / ")}
+                  </p>
+                  <p className="mt-1 text-[11px] font-semibold text-primary/70">Adds to {MEAL_LABELS[selectedMeal]}</p>
+                </div>
+                <div className="flex shrink-0 flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleManualRecentAdd(log)}
+                    className="flex h-7 w-7 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-[var(--shadow-button)]"
+                    aria-label={`Add ${log.foodName} again`}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeManualSavedFood(log)}
+                    className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Remove ${log.foodName} from saved manual foods`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         eyebrow="Foods"

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
@@ -6,7 +7,14 @@ import { AppPage, SectionCard } from "@/components/app/AppPage";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { MealCard } from "@/components/MealCard";
-import { deleteMealLog, getDashboard } from "@/lib/api";
+import { deleteMealLog, getDashboard, type DashboardMeal } from "@/lib/api";
+import {
+  getManualFoodLogDate,
+  type ManualFoodLog,
+  readManualFoodLogs,
+  removeManualFoodLogById,
+  writeManualFoodLogs,
+} from "@/lib/manual-food-logs";
 import { MealType, shiftDateKey, useApp } from "@/context/AppContext";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -50,9 +58,29 @@ function DashboardFallback({ onRetry, message }: { onRetry: () => void; message:
   );
 }
 
+function mapManualFoodLogToDashboardMeal(log: ManualFoodLog): DashboardMeal {
+  return {
+    id: log.id,
+    mealType: log.meal,
+    consumedAt: log.createdAt,
+    totalCalories: log.calories ?? 0,
+    totalProtein: log.protein ?? 0,
+    totalCarbs: log.carbs ?? 0,
+    totalFat: log.fat ?? 0,
+    totalFibre: log.fiber ?? 0,
+    itemCount: 1,
+    itemNames: [
+      [log.foodName, log.amount ? `(${log.amount})` : null, log.grams !== null ? `${Math.round(log.grams)}g` : null]
+        .filter(Boolean)
+        .join(" "),
+    ],
+  };
+}
+
 export default function Dashboard() {
   const { currentDate, setCurrentDate, uiMode, isBackendReady, isBootstrapping, retryBackendConnection } = useApp();
   const queryClient = useQueryClient();
+  const [manualFoodLogs, setManualFoodLogs] = useState<ManualFoodLog[]>(() => readManualFoodLogs());
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard", currentDate],
@@ -60,6 +88,21 @@ export default function Dashboard() {
     enabled: isBackendReady,
   });
   const todayKey = getTodayKey();
+
+  useEffect(() => {
+    const syncManualFoodLogs = () => {
+      setManualFoodLogs(readManualFoodLogs());
+    };
+
+    syncManualFoodLogs();
+    window.addEventListener("manualFoodLogsUpdated", syncManualFoodLogs);
+    window.addEventListener("storage", syncManualFoodLogs);
+
+    return () => {
+      window.removeEventListener("manualFoodLogsUpdated", syncManualFoodLogs);
+      window.removeEventListener("storage", syncManualFoodLogs);
+    };
+  }, [currentDate]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteMealLog,
@@ -73,16 +116,33 @@ export default function Dashboard() {
     },
   });
 
+  const manualLogsForDate = useMemo(
+    () => manualFoodLogs.filter((log) => getManualFoodLogDate(log) === currentDate),
+    [currentDate, manualFoodLogs],
+  );
+  const manualMeals = useMemo(() => manualLogsForDate.map(mapManualFoodLogToDashboardMeal), [manualLogsForDate]);
+  const manualCalories = manualMeals.reduce((sum, meal) => sum + meal.totalCalories, 0);
+  const manualProtein = manualMeals.reduce((sum, meal) => sum + meal.totalProtein, 0);
+  const manualCarbs = manualMeals.reduce((sum, meal) => sum + meal.totalCarbs, 0);
+  const manualFat = manualMeals.reduce((sum, meal) => sum + meal.totalFat, 0);
   const dashboard = dashboardQuery.data;
   const calorieGoal = dashboard?.goal?.calories ?? 2200;
   const proteinGoal = dashboard?.goal?.protein ?? 150;
   const carbsGoal = dashboard?.goal?.carbs ?? 220;
   const fatGoal = dashboard?.goal?.fat ?? 70;
-  const remainingCalories = Math.max(Math.round(dashboard?.remainingCalories ?? calorieGoal), 0);
-  const groupedMeals = mealTypes.reduce<Record<MealType, typeof dashboard.meals>>(
+  const dailyCalories = (dashboard?.daily.calories ?? 0) + manualCalories;
+  const dailyProtein = (dashboard?.daily.protein ?? 0) + manualProtein;
+  const dailyCarbs = (dashboard?.daily.carbs ?? 0) + manualCarbs;
+  const dailyFat = (dashboard?.daily.fat ?? 0) + manualFat;
+  const mealCount = (dashboard?.mealCount ?? 0) + manualMeals.length;
+  const remainingCalories = Math.max(Math.round(calorieGoal - dailyCalories), 0);
+  const allMeals = [...(dashboard?.meals ?? []), ...manualMeals].sort(
+    (first, second) => new Date(second.consumedAt).getTime() - new Date(first.consumedAt).getTime(),
+  );
+  const groupedMeals = mealTypes.reduce<Record<MealType, DashboardMeal[]>>(
     (acc, mealType) => ({
       ...acc,
-      [mealType]: dashboard?.meals.filter((meal) => meal.mealType === mealType) ?? [],
+      [mealType]: allMeals.filter((meal) => meal.mealType === mealType),
     }),
     {
       breakfast: [],
@@ -91,6 +151,23 @@ export default function Dashboard() {
       snack: [],
     },
   );
+
+  const deleteManualFoodLog = (logId: string) => {
+    const log = manualFoodLogs.find((item) => item.id === logId);
+    const nextLogs = removeManualFoodLogById(manualFoodLogs, logId);
+    setManualFoodLogs(nextLogs);
+    writeManualFoodLogs(nextLogs);
+    toast.success(log ? `${log.foodName} removed.` : "Manual food removed.");
+  };
+
+  const handleDeleteMeal = (mealId: string) => {
+    if (mealId.startsWith("manual-food-")) {
+      deleteManualFoodLog(mealId);
+      return;
+    }
+
+    deleteMutation.mutate(mealId);
+  };
 
   return (
     <AppPage>
@@ -150,13 +227,13 @@ export default function Dashboard() {
             variant="hero"
             eyebrow="Today"
             title={`${remainingCalories} kcal left`}
-            description={`${Math.round(dashboard.daily.calories)} / ${calorieGoal} kcal`}
+            description={`${Math.round(dailyCalories)} / ${calorieGoal} kcal`}
           >
             <div className="flex items-center justify-between gap-4">
               <div className="grid min-w-0 flex-1 gap-2">
                 <div className="rounded-[18px] bg-card/60 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Meals</p>
-                  <p className="display-font mt-1 text-xl font-bold text-foreground">{dashboard.mealCount}</p>
+                  <p className="display-font mt-1 text-xl font-bold text-foreground">{mealCount}</p>
                 </div>
                 <div className="rounded-[18px] bg-card/60 px-3 py-3">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Burned</p>
@@ -164,7 +241,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="shrink-0 rounded-[28px] bg-surface-elevated/70 p-3 shadow-[var(--shadow-card)]">
-                <CalorieRing consumed={dashboard.daily.calories} goal={calorieGoal} size={148} />
+                <CalorieRing consumed={dailyCalories} goal={calorieGoal} size={148} />
               </div>
             </div>
           </SectionCard>
@@ -172,9 +249,9 @@ export default function Dashboard() {
           {uiMode === "advanced" ? (
             <SectionCard eyebrow="Advanced" title="Macros">
               <div className="grid gap-3">
-                <MacroBar label="Protein" current={dashboard.daily.protein} goal={proteinGoal} color="hsl(var(--protein))" />
-                <MacroBar label="Carbs" current={dashboard.daily.carbs} goal={carbsGoal} color="hsl(var(--carbs))" />
-                <MacroBar label="Fat" current={dashboard.daily.fat} goal={fatGoal} color="hsl(var(--fat))" />
+                <MacroBar label="Protein" current={dailyProtein} goal={proteinGoal} color="hsl(var(--protein))" />
+                <MacroBar label="Carbs" current={dailyCarbs} goal={carbsGoal} color="hsl(var(--carbs))" />
+                <MacroBar label="Fat" current={dailyFat} goal={fatGoal} color="hsl(var(--fat))" />
               </div>
             </SectionCard>
           ) : null}
@@ -191,7 +268,7 @@ export default function Dashboard() {
                 key={mealType}
                 mealType={mealType}
                 entries={groupedMeals[mealType]}
-                onDelete={(mealId) => deleteMutation.mutate(mealId)}
+                onDelete={handleDeleteMeal}
                 isMutating={deleteMutation.isPending}
               />
             ))}
