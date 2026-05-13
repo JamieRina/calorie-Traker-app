@@ -1,5 +1,7 @@
 import { z } from "zod";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
+import { ApiError } from "../../lib/api-error";
 import { recipeParserService } from "./recipe-parser.service";
 import { createRecipeSchema } from "./recipes.validators";
 
@@ -11,6 +13,10 @@ export class RecipesService {
   }
 
   async createRecipe(userId: string, input: CreateRecipeInput) {
+    if (env.LOCAL_BACKEND_MODE === "force_local") {
+      throw new ApiError(503, "Saving recipes requires database mode");
+    }
+
     const nutritionFact = await prisma.nutritionFact.create({
       data: input.nutrition
     });

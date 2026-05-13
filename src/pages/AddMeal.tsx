@@ -9,19 +9,15 @@ import { Slider } from "@/components/ui/slider";
 import { FOOD_DATABASE, Food, MealType, MEAL_LABELS, useApp } from "@/context/AppContext";
 import { createMealLog, listFavouriteFoods, listRecentFoods, searchFoods, setFavouriteFood, type SearchFood } from "@/lib/api";
 import {
-  addManualFoodLog,
   createManualFoodLog,
   createManualSavedFood,
-  hasManualFoodLogDuplicate,
   type ManualFoodLog,
   type ManualSavedFood,
   parseManualCalories,
   parseManualOptionalNumber,
-  readManualFoodLogs,
   readManualSavedFoods,
   removeManualSavedFoodById,
   upsertManualSavedFood,
-  writeManualFoodLogs,
   writeManualSavedFoods,
 } from "@/lib/manual-food-logs";
 import { cn } from "@/lib/utils";
@@ -67,6 +63,25 @@ function decorateFallbackFood(food: Food): SearchFood {
   };
 }
 
+function manualLogToSearchFood(log: ManualFoodLog): SearchFood {
+  return {
+    id: `food-${log.id}`,
+    name: log.foodName,
+    servingSize: log.amount || (log.grams ? `${log.grams} g` : "1 serving"),
+    source: "Community",
+    mealHints: mealOptions,
+    calories: log.calories ?? 0,
+    protein: log.protein ?? 0,
+    carbs: log.carbs ?? 0,
+    fat: log.fat ?? 0,
+    fiber: log.fiber ?? 0,
+    iron: 0,
+    vitaminC: 0,
+    apiSource: "local",
+    sourceLabel: "Manual entry",
+  };
+}
+
 export default function AddMeal() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,9 +98,7 @@ export default function AddMeal() {
   const [manualCarbs, setManualCarbs] = useState("");
   const [manualFat, setManualFat] = useState("");
   const [manualFiber, setManualFiber] = useState("");
-  const [manualFoodLogs, setManualFoodLogs] = useState<ManualFoodLog[]>(() => readManualFoodLogs());
   const [manualSavedFoods, setManualSavedFoods] = useState<ManualSavedFood[]>(() => readManualSavedFoods());
-  const manualFoodLogsRef = useRef(manualFoodLogs);
   const manualSavedFoodsRef = useRef(manualSavedFoods);
   const [selectedFood, setSelectedFood] = useState<SearchFood | null>(null);
   const [portion, setPortion] = useState([1]);
@@ -101,10 +114,6 @@ export default function AddMeal() {
       setSelectedMeal(requestedMeal);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    manualFoodLogsRef.current = manualFoodLogs;
-  }, [manualFoodLogs]);
 
   useEffect(() => {
     manualSavedFoodsRef.current = manualSavedFoods;
@@ -226,14 +235,6 @@ export default function AddMeal() {
   const favouriteKeys = new Set(favouriteFoods.map(foodMatchKey));
   const canAddManualFood = manualFoodName.trim().length > 0;
 
-  const saveManualFoodLog = (log: ManualFoodLog) => {
-    const currentLogs = manualFoodLogsRef.current;
-    const nextLogs = addManualFoodLog(currentLogs, log);
-    manualFoodLogsRef.current = nextLogs;
-    setManualFoodLogs(nextLogs);
-    writeManualFoodLogs(nextLogs);
-  };
-
   const saveManualSavedFood = (food: ManualSavedFood) => {
     const nextFoods = upsertManualSavedFood(manualSavedFoodsRef.current, food);
     manualSavedFoodsRef.current = nextFoods;
@@ -254,6 +255,11 @@ export default function AddMeal() {
     const foodName = manualFoodName.trim();
 
     if (!foodName) {
+      return;
+    }
+
+    if (!isBackendReady) {
+      toast.error("Manual logging is still getting ready. Try again in a moment.");
       return;
     }
 
@@ -287,33 +293,33 @@ export default function AddMeal() {
       date: currentDate,
     });
 
-    if (hasManualFoodLogDuplicate(manualFoodLogsRef.current, log)) {
-      toast.info(`${log.foodName} is already logged for ${MEAL_LABELS[log.meal]}. Use the saved + button to add another.`);
-      return;
-    }
-
-    saveManualFoodLog(log);
-    saveManualSavedFood(
-      createManualSavedFood({
-        foodName: log.foodName,
-        amount: log.amount,
-        grams: log.grams,
-        calories: log.calories,
-        protein: log.protein,
-        carbs: log.carbs,
-        fat: log.fat,
-        fiber: log.fiber,
-      }),
+    createMealMutation.mutate(
+      { food: manualLogToSearchFood(log), quantity: 1 },
+      {
+        onSuccess: () => {
+          saveManualSavedFood(
+            createManualSavedFood({
+              foodName: log.foodName,
+              amount: log.amount,
+              grams: log.grams,
+              calories: log.calories,
+              protein: log.protein,
+              carbs: log.carbs,
+              fat: log.fat,
+              fiber: log.fiber,
+            }),
+          );
+          setManualFoodName("");
+          setManualAmount("");
+          setManualGrams("");
+          setManualCalories("");
+          setManualProtein("");
+          setManualCarbs("");
+          setManualFat("");
+          setManualFiber("");
+        },
+      },
     );
-    setManualFoodName("");
-    setManualAmount("");
-    setManualGrams("");
-    setManualCalories("");
-    setManualProtein("");
-    setManualCarbs("");
-    setManualFat("");
-    setManualFiber("");
-    toast.success(`${log.foodName} added to ${MEAL_LABELS[log.meal]}.`);
   };
 
   const handleManualRecentAdd = (food: ManualSavedFood) => {
@@ -330,9 +336,17 @@ export default function AddMeal() {
       date: currentDate,
     });
 
-    saveManualFoodLog(nextLog);
-    saveManualSavedFood(food);
-    toast.success(`${nextLog.foodName} added to ${MEAL_LABELS[nextLog.meal]}.`);
+    if (!isBackendReady) {
+      toast.error("Manual logging is still getting ready. Try again in a moment.");
+      return;
+    }
+
+    createMealMutation.mutate(
+      { food: manualLogToSearchFood(nextLog), quantity: 1 },
+      {
+        onSuccess: () => saveManualSavedFood(food),
+      },
+    );
   };
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -397,6 +411,7 @@ export default function AddMeal() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search foods or brands"
+                aria-label="Search foods or brands"
                 className="h-12 border-border/80 bg-surface-elevated/80 pl-11"
               />
             </div>
@@ -434,22 +449,22 @@ export default function AddMeal() {
             value={manualFoodName}
             onChange={(event) => setManualFoodName(event.target.value)}
             placeholder="Food name"
+            aria-label="Manual food name"
             className="h-11 border-border/80 bg-card/75"
           />
           <div className="grid grid-cols-[76px_88px_minmax(0,1fr)] gap-2">
             <Input
-              type="number"
-              min="1"
-              step="1"
               value={manualAmount}
               onChange={(event) => setManualAmount(event.target.value)}
               placeholder="Amount"
+              aria-label="Manual food amount"
               className="h-11 border-border/80 bg-card/75 px-2"
             />
             <Input
               value={manualGrams}
               onChange={(event) => setManualGrams(event.target.value)}
               placeholder="Grams"
+              aria-label="Manual food grams"
               inputMode="decimal"
               className="h-11 border-border/80 bg-card/75 px-2 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
@@ -457,6 +472,7 @@ export default function AddMeal() {
               value={manualCalories}
               onChange={(event) => setManualCalories(event.target.value)}
               placeholder="Calories"
+              aria-label="Manual food calories"
               inputMode="decimal"
               className="h-11 border-border/80 bg-card/75 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
@@ -467,6 +483,7 @@ export default function AddMeal() {
                 value={manualProtein}
                 onChange={(event) => setManualProtein(event.target.value)}
                 placeholder="Protein"
+                aria-label="Manual food protein grams"
                 inputMode="decimal"
                 className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
@@ -474,6 +491,7 @@ export default function AddMeal() {
                 value={manualCarbs}
                 onChange={(event) => setManualCarbs(event.target.value)}
                 placeholder="Carbs"
+                aria-label="Manual food carbohydrate grams"
                 inputMode="decimal"
                 className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
@@ -481,6 +499,7 @@ export default function AddMeal() {
                 value={manualFat}
                 onChange={(event) => setManualFat(event.target.value)}
                 placeholder="Fat"
+                aria-label="Manual food fat grams"
                 inputMode="decimal"
                 className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />
@@ -488,6 +507,7 @@ export default function AddMeal() {
                 value={manualFiber}
                 onChange={(event) => setManualFiber(event.target.value)}
                 placeholder="Fibre"
+                aria-label="Manual food fibre grams"
                 inputMode="decimal"
                 className="h-10 border-border/80 bg-card/75 px-2 text-sm [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               />

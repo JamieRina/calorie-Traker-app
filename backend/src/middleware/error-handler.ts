@@ -19,7 +19,7 @@ export function errorHandler(
   if (error instanceof ApiError) {
     return response.status(error.statusCode).json({
       message: error.message,
-      details: error.details
+      details: process.env.NODE_ENV === "production" ? undefined : error.details
     });
   }
 

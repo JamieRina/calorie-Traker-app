@@ -16,9 +16,12 @@ backend/.local-data/
 *.local
 
 # Editor directories and files
+.vs/
 .vscode/*
 !.vscode/extensions.json
 .idea
+coverage/
+.nyc_output/
 .DS_Store
 *.suo
 *.ntvs*

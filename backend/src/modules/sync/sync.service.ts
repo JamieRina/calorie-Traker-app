@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../lib/api-error";
 import { SyncStatus } from "../../lib/domain-enums";
@@ -20,6 +21,29 @@ type SyncDbClient = Pick<typeof prisma, "syncMutation" | "food" | "recipe" | "me
 
 export class SyncService {
   async applyMutations(userId: string, mutations: SyncMutationInput[]) {
+    if (env.LOCAL_BACKEND_MODE === "force_local") {
+      const results = [];
+
+      for (const mutation of mutations) {
+        try {
+          const resourceId = await this.applyLocalMutation(userId, mutation);
+          results.push({
+            clientMutationId: mutation.clientMutationId,
+            status: SyncStatus.applied,
+            resourceId
+          });
+        } catch (error) {
+          results.push({
+            clientMutationId: mutation.clientMutationId,
+            status: SyncStatus.failed,
+            errorMessage: error instanceof Error ? error.message : "Unknown sync error"
+          });
+        }
+      }
+
+      return results;
+    }
+
     const results = [];
 
     for (const mutation of mutations) {
@@ -102,6 +126,40 @@ export class SyncService {
     }
 
     return results;
+  }
+
+  private async applyLocalMutation(userId: string, mutation: SyncMutationInput) {
+    switch (mutation.entityType) {
+      case "meal_log": {
+        if (mutation.operation !== "create") {
+          throw new ApiError(400, "Only create is supported for meal_log sync");
+        }
+
+        const payload = createMealSchema.parse(mutation.payload) as CreateMealInput;
+        const meal = await mealsService.createMeal(userId, payload);
+        return meal.id;
+      }
+      case "progress_entry": {
+        if (mutation.operation !== "create") {
+          throw new ApiError(400, "Only create is supported for progress_entry sync");
+        }
+
+        const payload = createProgressSchema.parse(mutation.payload) as CreateProgressInput;
+        const entry = await progressService.create(userId, payload);
+        return entry.id;
+      }
+      case "workout": {
+        if (mutation.operation !== "create") {
+          throw new ApiError(400, "Only create is supported for workout sync");
+        }
+
+        const payload = createWorkoutSchema.parse(mutation.payload) as CreateWorkoutInput;
+        const workout = await workoutsService.create(userId, payload);
+        return workout.id;
+      }
+      default:
+        throw new ApiError(400, `Unsupported sync entity type: ${mutation.entityType}`);
+    }
   }
 
   private async applyMutation(db: SyncDbClient, userId: string, mutation: SyncMutationInput) {

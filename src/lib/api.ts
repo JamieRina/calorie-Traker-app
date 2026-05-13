@@ -5,9 +5,13 @@ const SESSION_STORAGE_KEY = "bitebalance-session";
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
 const ALL_MEAL_TYPES: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
+if (import.meta.env.PROD && !apiBaseUrl.startsWith("https://")) {
+  throw new Error("VITE_API_BASE_URL must be an HTTPS URL in production builds.");
+}
+
 export type SessionTokens = {
   accessToken: string;
-  refreshToken: string;
+  refreshToken?: string;
 };
 
 export type GoalType = "lose" | "maintain" | "gain";
@@ -20,6 +24,17 @@ export type StarterProfileInput = {
   currentWeightKg: number;
   targetWeightKg: number;
   activityLevel: "sedentary" | "light" | "moderate" | "active" | "athlete";
+};
+
+export type ProfileSettingsInput = Partial<StarterProfileInput> & {
+  displayName?: string;
+  goalType?: GoalType;
+};
+
+export type PendingSignupResult = {
+  requiresVerification: true;
+  email: string;
+  expiresInMinutes: number;
 };
 
 type ApiNutritionFact = {
@@ -262,7 +277,8 @@ function readStoredSession() {
     return null;
   }
 
-  const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+  window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
   if (!raw) {
     return null;
   }
@@ -270,15 +286,18 @@ function readStoredSession() {
   try {
     return JSON.parse(raw) as SessionTokens;
   } catch {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
     return null;
   }
 }
 
 function writeStoredSession(session: SessionTokens) {
-  sessionCache = session;
+  sessionCache = {
+    accessToken: session.accessToken,
+  };
   if (isBrowser()) {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionCache));
   }
 }
 
@@ -286,6 +305,7 @@ function clearStoredSession() {
   sessionCache = null;
   if (isBrowser()) {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
   }
 }
 
@@ -301,9 +321,16 @@ export function clearSession() {
   clearStoredSession();
 }
 
-function defaultHeaders(init?: HeadersInit) {
+export async function restoreSession() {
+  const session = await refreshSession();
+  writeStoredSession(session);
+  return session;
+}
+
+function defaultHeaders(init?: HeadersInit, hasBody = false) {
   return {
-    "Content-Type": "application/json",
+    Accept: "application/json",
+    ...(hasBody ? { "Content-Type": "application/json" } : {}),
     ...(init ?? {}),
   };
 }
@@ -313,8 +340,21 @@ async function parseResponse<T>(response: Response) {
     let message = `Request failed with status ${response.status}`;
 
     try {
-      const body = (await response.json()) as { message?: string };
-      if (body.message) {
+      const body = (await response.clone().json()) as {
+        message?: string;
+        issues?: {
+          fieldErrors?: Record<string, string[]>;
+          formErrors?: string[];
+        };
+      };
+      const firstFieldError = body.issues?.fieldErrors
+        ? Object.values(body.issues.fieldErrors).flat().find(Boolean)
+        : undefined;
+      const firstFormError = body.issues?.formErrors?.find(Boolean);
+
+      if (firstFieldError || firstFormError) {
+        message = firstFieldError ?? firstFormError ?? message;
+      } else if (body.message) {
         message = body.message;
       }
     } catch {
@@ -338,10 +378,19 @@ async function parseResponse<T>(response: Response) {
   return (await response.json()) as T;
 }
 
+async function safeFetch(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw createApiError("Network error. Check your connection and try again.");
+  }
+}
+
 async function publicRequest<T>(path: string, init?: RequestInit) {
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await safeFetch(`${apiBaseUrl}${path}`, {
     ...init,
-    headers: defaultHeaders(init?.headers),
+    credentials: "include",
+    headers: defaultHeaders(init?.headers, Boolean(init?.body)),
   });
 
   return parseResponse<T>(response);
@@ -356,12 +405,9 @@ async function requestAuthTokens(path: string, body: Record<string, unknown>) {
 
 async function refreshSession() {
   const existingSession = sessionCache ?? readStoredSession();
-  if (!existingSession?.refreshToken) {
-    throw createApiError("No refresh token available");
-  }
 
   const refreshedSession = await requestAuthTokens("/auth/refresh", {
-    refreshToken: existingSession.refreshToken,
+    ...(existingSession?.refreshToken ? { refreshToken: existingSession.refreshToken } : {}),
   });
 
   writeStoredSession(refreshedSession);
@@ -384,12 +430,13 @@ async function ensureSession() {
 
 async function authedRequest<T>(path: string, init?: RequestInit, allowRetry = true): Promise<T> {
   const session = await ensureSession();
-  const response = await fetch(`${apiBaseUrl}${path}`, {
+  const response = await safeFetch(`${apiBaseUrl}${path}`, {
     ...init,
+    credentials: "include",
     headers: defaultHeaders({
       Authorization: `Bearer ${session.accessToken}`,
       ...(init?.headers ?? {}),
-    }),
+    }, Boolean(init?.body)),
   });
 
   if (response.status === 401 && allowRetry) {
@@ -415,7 +462,7 @@ function dateOfBirthFromAge(age: number) {
 }
 
 export async function checkBackendHealth() {
-  const response = await fetch(`${getApiRootUrl()}/health`, {
+  const response = await safeFetch(`${getApiRootUrl()}/health`, {
     headers: {
       Accept: "application/json",
     },
@@ -464,30 +511,78 @@ export async function saveStarterProfile(input: StarterProfileInput) {
 }
 
 export async function registerAccount(input: StarterProfileInput & { email: string; password: string }) {
-  const session = await requestAuthTokens("/auth/register", {
-    email: input.email.trim().toLowerCase(),
-    password: input.password,
-    displayName: input.displayName.trim(),
+  return publicRequest<PendingSignupResult>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({
+      email: input.email.trim().toLowerCase(),
+      password: input.password,
+      displayName: input.displayName.trim(),
+    }),
+  });
+}
+
+export async function verifySignupCode(email: string, code: string) {
+  const session = await requestAuthTokens("/auth/verify-signup", {
+    email: email.trim().toLowerCase(),
+    code: code.trim(),
   });
 
   writeStoredSession(session);
-  await saveStarterProfile(input);
   return session;
+}
+
+export async function resendSignupVerification(email: string) {
+  return publicRequest<{ success: true; expiresInMinutes: number }>("/auth/verification/resend", {
+    method: "POST",
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+    }),
+  });
 }
 
 export async function logoutAccount() {
   const existingSession = sessionCache ?? readStoredSession();
 
   try {
-    if (existingSession?.refreshToken) {
-      await publicRequest("/auth/logout", {
-        method: "POST",
-        body: JSON.stringify({ refreshToken: existingSession.refreshToken }),
-      });
-    }
+    await publicRequest("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify(existingSession?.refreshToken ? { refreshToken: existingSession.refreshToken } : {}),
+    });
   } finally {
     clearStoredSession();
   }
+}
+
+export async function requestPasswordReset(email: string) {
+  return publicRequest<{ success: true; debugResetToken?: string }>("/auth/password-reset/request", {
+    method: "POST",
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+    }),
+  });
+}
+
+export async function confirmPasswordReset(token: string, password: string) {
+  const result = await publicRequest<{ success: true }>("/auth/password-reset/confirm", {
+    method: "POST",
+    body: JSON.stringify({
+      token: token.trim(),
+      password,
+    }),
+  });
+
+  clearStoredSession();
+  return result;
+}
+
+export async function deleteAccount(password: string) {
+  const result = await authedRequest<{ success: true }>("/auth/account", {
+    method: "DELETE",
+    body: JSON.stringify({ password }),
+  });
+
+  clearStoredSession();
+  return result;
 }
 
 function formatAge(dateOfBirth?: string | null) {
@@ -563,7 +658,7 @@ function formatServing(nutritionFact: ApiNutritionFact) {
   return "1 serving";
 }
 
-function mapBackendFood(food: ApiFoodEntity, sourceLabel = "Saved foods"): Food {
+function mapBackendFood(food: ApiFoodEntity): Food {
   return {
     id: food.id,
     name: food.name,
@@ -718,7 +813,7 @@ export async function importFood(food: ReturnType<typeof normaliseImportedFood>)
     body: JSON.stringify(food),
   });
 
-  return mapBackendFood(payload, "Saved foods");
+  return mapBackendFood(payload);
 }
 
 export async function getDashboard(date: string) {
@@ -756,9 +851,25 @@ export async function deleteMealLog(mealId: string) {
   });
 }
 
+export async function updateMealLog(
+  mealId: string,
+  input: {
+    consumedAt?: string;
+    mealType?: MealType;
+    notes?: string | null;
+  },
+) {
+  const payload = await authedRequest<ApiMealLog>(`/meals/${mealId}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+
+  return mapDashboardMeal(payload);
+}
+
 export async function listRecentFoods() {
   const payload = await authedRequest<ApiFoodEntity[]>("/foods/recent");
-  return payload.map((food) => mapBackendFood(food, "Recent foods"));
+  return payload.map(mapBackendFood);
 }
 
 export async function listFavouriteFoods() {
@@ -766,7 +877,7 @@ export async function listFavouriteFoods() {
   return payload
     .map((item) => item.food)
     .filter((food): food is ApiFoodEntity => Boolean(food))
-    .map((food) => mapBackendFood(food, "Favourites"));
+    .map(mapBackendFood);
 }
 
 export async function setFavouriteFood(food: Food | SearchFood, isFavourite: boolean) {
@@ -811,6 +922,30 @@ export async function listProgressEntries() {
 export async function getProfileSummary() {
   const payload = await authedRequest<ApiProfileResponse>("/profile/me");
   return mapProfile(payload);
+}
+
+export async function updateProfileSettings(input: ProfileSettingsInput) {
+  await authedRequest<ApiProfileResponse>("/profile/me", {
+    method: "PATCH",
+    body: JSON.stringify({
+      ...(input.displayName ? { displayName: input.displayName.trim() } : {}),
+      ...(input.age ? { dateOfBirth: dateOfBirthFromAge(input.age) } : {}),
+      ...(input.heightCm ? { heightCm: input.heightCm } : {}),
+      ...(input.currentWeightKg ? { currentWeightKg: input.currentWeightKg } : {}),
+      ...(input.targetWeightKg ? { targetWeightKg: input.targetWeightKg } : {}),
+      ...(input.activityLevel ? { activityLevel: input.activityLevel } : {}),
+      onboardingDone: true,
+    }),
+  });
+
+  if (input.goalType) {
+    await authedRequest("/profile/goal", {
+      method: "POST",
+      body: JSON.stringify({ goalType: input.goalType }),
+    });
+  }
+
+  return getProfileSummary();
 }
 
 export async function getCommunityFeed() {

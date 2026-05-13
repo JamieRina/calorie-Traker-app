@@ -1,5 +1,6 @@
-import { FormEvent, useMemo, useState } from "react";
-import { Activity, ArrowRight, LockKeyhole, Mail, ShieldCheck, UserRound } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Activity, ArrowRight, LockKeyhole, Mail, RefreshCw, ShieldCheck, UserRound } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
 import { SectionCard } from "@/components/app/AppPage";
@@ -9,7 +10,7 @@ import { useApp } from "@/context/AppContext";
 import type { GoalType } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-type AuthMode = "login" | "signup";
+type AuthMode = "login" | "signup" | "verify" | "forgot" | "reset";
 
 const activityOptions = [
   { value: "sedentary", label: "Desk based" },
@@ -50,14 +51,43 @@ function toPositiveNumber(value: string, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function getPasswordIssue(password: string) {
+  if (password.length < 8) {
+    return "Use a password with at least 8 characters.";
+  }
+
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    return "Use at least one uppercase letter, one lowercase letter, and one number.";
+  }
+
+  return null;
+}
+
+function isInRange(value: string, min: number, max: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max;
+}
+
 export default function Auth() {
-  const { login, signUp, isAuthBusy } = useAuth();
+  const { login, signUp, verifySignUp, resendSignUpCode, sendPasswordReset, resetPassword, isAuthBusy, pendingSignupEmail } = useAuth();
   const { isBackendReady, isBootstrapping, retryBackendConnection } = useApp();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<AuthMode>("login");
   const [form, setForm] = useState(defaultForm);
+  const [resetToken, setResetToken] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const headline = mode === "login" ? "Welcome back" : "Create your account";
+  const headline =
+    mode === "login"
+      ? "Welcome back"
+      : mode === "signup"
+        ? "Create your account"
+        : mode === "verify"
+          ? "Verify your email"
+          : mode === "forgot"
+            ? "Reset password"
+            : "Choose new password";
   const canSubmit = isBackendReady && !isAuthBusy;
 
   const selectedGoal = useMemo(
@@ -72,6 +102,21 @@ export default function Auth() {
     }));
   }
 
+  useEffect(() => {
+    const token = searchParams.get("resetToken");
+    if (token) {
+      setResetToken(token);
+      setMode("reset");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (pendingSignupEmail && mode === "login") {
+      setForm((current) => ({ ...current, email: pendingSignupEmail }));
+      setMode("verify");
+    }
+  }, [mode, pendingSignupEmail]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -81,15 +126,81 @@ export default function Auth() {
       return;
     }
 
-    if (!form.email.includes("@") || form.password.length < 8) {
-      setError("Use a valid email and a password with at least 8 characters.");
+    if ((mode === "login" || mode === "signup" || mode === "verify" || mode === "forgot") && !form.email.includes("@")) {
+      setError("Use a valid email address.");
       return;
     }
 
+    if (mode === "login" && !form.password) {
+      setError("Enter your password.");
+      return;
+    }
+
+    if (mode === "signup" || mode === "reset") {
+      const passwordIssue = getPasswordIssue(form.password);
+      if (passwordIssue) {
+        setError(passwordIssue);
+        return;
+      }
+    }
+
+    if (mode === "signup") {
+      if (!isInRange(form.age, 13, 100)) {
+        setError("Enter an age between 13 and 100.");
+        return;
+      }
+
+      if (!isInRange(form.heightCm, 80, 250)) {
+        setError("Enter a height between 80 cm and 250 cm.");
+        return;
+      }
+
+      if (!isInRange(form.currentWeightKg, 25, 350) || !isInRange(form.targetWeightKg, 25, 350)) {
+        setError("Enter current and target weights between 25 kg and 350 kg.");
+        return;
+      }
+    }
+
     try {
+      if (mode === "forgot") {
+        const debugToken = await sendPasswordReset(form.email);
+        if (debugToken) {
+          setResetToken(debugToken);
+          setMode("reset");
+        }
+        toast.success(debugToken ? "Reset token generated for local testing." : "Check your email for a reset link.");
+        return;
+      }
+
+      if (mode === "reset") {
+        if (resetToken.trim().length < 32) {
+          setError("Enter the reset token from your email.");
+          return;
+        }
+
+        await resetPassword(resetToken, form.password);
+        setForm((current) => ({ ...current, password: "" }));
+        setResetToken("");
+        setMode("login");
+        toast.success("Password updated. Log in with your new password.");
+        return;
+      }
+
       if (mode === "login") {
         await login(form.email, form.password);
         toast.success("Logged in.");
+        return;
+      }
+
+      if (mode === "verify") {
+        if (!/^\d{6}$/.test(verificationCode.trim())) {
+          setError("Enter the 6-digit code from your email.");
+          return;
+        }
+
+        await verifySignUp(form.email, verificationCode);
+        setVerificationCode("");
+        toast.success("Email verified. Welcome in.");
         return;
       }
 
@@ -98,7 +209,7 @@ export default function Auth() {
         return;
       }
 
-      await signUp({
+      const result = await signUp({
         displayName: form.displayName,
         email: form.email,
         password: form.password,
@@ -109,9 +220,28 @@ export default function Auth() {
         goalType: form.goalType,
         activityLevel: form.activityLevel,
       });
-      toast.success("Account created.");
+      setForm((current) => ({ ...current, email: result.email, password: "" }));
+      setVerificationCode("");
+      setMode("verify");
+      toast.success(`Check your email for a code. It expires in ${result.expiresInMinutes} minutes.`);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Something went wrong. Please try again.");
+    }
+  }
+
+  async function handleResendVerification() {
+    setError(null);
+
+    if (!form.email.includes("@")) {
+      setError("Use a valid email address before requesting a new code.");
+      return;
+    }
+
+    try {
+      const expiresInMinutes = await resendSignUpCode(form.email);
+      toast.success(`New code sent. It expires in ${expiresInMinutes} minutes.`);
+    } catch (resendError) {
+      setError(resendError instanceof Error ? resendError.message : "Could not resend the code yet.");
     }
   }
 
@@ -167,35 +297,75 @@ export default function Auth() {
               </label>
             ) : null}
 
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Email</span>
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
-                  className="h-12 border-border/80 bg-surface-elevated/80 pl-10"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                />
-              </div>
-            </label>
+            {mode !== "reset" ? (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Email</span>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => updateField("email", event.target.value)}
+                    className="h-12 border-border/80 bg-surface-elevated/80 pl-10"
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                  />
+                </div>
+              </label>
+            ) : null}
 
-            <label className="block">
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Password</span>
-              <div className="relative">
-                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                  className="h-12 border-border/80 bg-surface-elevated/80 pl-10"
-                  placeholder="Minimum 8 characters"
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                />
-              </div>
-            </label>
+            {mode === "verify" ? (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Verification code</span>
+                <div className="relative">
+                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={verificationCode}
+                    onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="h-12 border-border/80 bg-surface-elevated/80 pl-10 text-center text-lg font-bold tracking-[0.22em]"
+                    placeholder="000000"
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                  />
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  Enter the 6-digit code we emailed. Your account stays locked until this step is complete.
+                </p>
+              </label>
+            ) : null}
+
+            {mode === "reset" ? (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Reset token</span>
+                <div className="relative">
+                  <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={resetToken}
+                    onChange={(event) => setResetToken(event.target.value)}
+                    className="h-12 border-border/80 bg-surface-elevated/80 pl-10"
+                    placeholder="Paste token from email"
+                    autoComplete="one-time-code"
+                  />
+                </div>
+              </label>
+            ) : null}
+
+            {mode === "login" || mode === "signup" || mode === "reset" ? (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Password</span>
+                <div className="relative">
+                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="password"
+                    value={form.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                    className="h-12 border-border/80 bg-surface-elevated/80 pl-10"
+                    placeholder="8+ chars, Aa, 123"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  />
+                </div>
+              </label>
+            ) : null}
 
             {mode === "signup" ? (
               <div className="space-y-3 rounded-[22px] border border-border/75 bg-card/60 p-3">
@@ -300,9 +470,55 @@ export default function Auth() {
               disabled={!canSubmit}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-button)] transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {mode === "login" ? "Log in" : `Start ${selectedGoal.label.toLowerCase()}`}
+              {mode === "login"
+                ? "Log in"
+                : mode === "signup"
+                  ? `Start ${selectedGoal.label.toLowerCase()}`
+                  : mode === "verify"
+                    ? "Verify account"
+                    : mode === "forgot"
+                      ? "Send reset link"
+                      : "Update password"}
               <ArrowRight className="h-4 w-4" />
             </button>
+
+            {mode === "verify" ? (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={!canSubmit}
+                className="flex w-full items-center justify-center gap-2 py-2 text-center text-sm font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Resend code
+              </button>
+            ) : null}
+
+            {mode === "login" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("forgot");
+                  setError(null);
+                }}
+                className="w-full py-2 text-center text-sm font-semibold text-primary"
+              >
+                Forgot password?
+              </button>
+            ) : null}
+
+            {mode === "forgot" || mode === "reset" || mode === "verify" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+                className="w-full py-2 text-center text-sm font-semibold text-primary"
+              >
+                Back to login
+              </button>
+            ) : null}
           </form>
         </SectionCard>
       </div>

@@ -13,6 +13,15 @@ export class MealsController {
     response.json(result);
   }
 
+  async update(request: AuthenticatedRequest, response: Response) {
+    const result = await mealsService.updateMeal(
+      request.user!.sub,
+      String(request.params.mealId),
+      request.body
+    );
+    response.json(result);
+  }
+
   async remove(request: AuthenticatedRequest, response: Response) {
     const result = await mealsService.removeMeal(request.user!.sub, String(request.params.mealId));
     response.json(result);

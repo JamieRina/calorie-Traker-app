@@ -58,61 +58,91 @@ enum SyncStatus {
 }
 
 model User {
-  id               String              @id @default(cuid())
-  email            String              @unique
-  passwordHash     String
-  displayName      String
-  isEmailVerified  Boolean             @default(false)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  profile          UserProfile?
-  goal             Goal?
-  preferences      DietaryPreference[]
-  mealLogs         MealLog[]
-  recipes          Recipe[]
-  favourites       Favourite[]
-  progressEntries  ProgressEntry[]
-  workouts         Workout[]
-  reminders        Reminder[]
-  refreshTokens    RefreshToken[]
-  syncMutations    SyncMutation[]
-  badges           UserBadge[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  passwordHash        String
+  displayName         String
+  isEmailVerified     Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  profile             UserProfile?
+  goal                Goal?
+  preferences         DietaryPreference[]
+  mealLogs            MealLog[]
+  recipes             Recipe[]
+  favourites          Favourite[]
+  progressEntries     ProgressEntry[]
+  workouts            Workout[]
+  reminders           Reminder[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  syncMutations       SyncMutation[]
+  badges              UserBadge[]
 }
 
 model RefreshToken {
-  id         String   @id @default(cuid())
-  tokenHash  String
-  expiresAt  DateTime
-  revokedAt  DateTime?
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 
   @@index([userId, expiresAt])
 }
 
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model EmailVerificationToken {
+  id                 String    @id @default(cuid())
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  resendCount        Int       @default(0)
+  verifyAttemptCount Int       @default(0)
+  lastSentAt         DateTime  @default(now())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([userId, consumedAt])
+}
+
 model UserProfile {
-  id               String        @id @default(cuid())
-  userId           String        @unique
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dateOfBirth      DateTime?
-  sex              Sex           @default(undisclosed)
-  heightCm         Float?
-  currentWeightKg  Float?
-  targetWeightKg   Float?
-  activityLevel    ActivityLevel @default(moderate)
-  timezone         String        @default("Europe/London")
-  locale           String        @default("en-GB")
-  avatarUrl        String?
-  onboardingDone   Boolean       @default(false)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth     DateTime?
+  sex             Sex           @default(undisclosed)
+  heightCm        Float?
+  currentWeightKg Float?
+  targetWeightKg  Float?
+  activityLevel   ActivityLevel @default(moderate)
+  timezone        String        @default("Europe/London")
+  locale          String        @default("en-GB")
+  avatarUrl       String?
+  onboardingDone  Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model Goal {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   goalType          GoalType
   dailyCalories     Int
   proteinGrams      Int
@@ -120,106 +150,106 @@ model Goal {
   fatsGrams         Int
   fibreGrams        Int
   weeklyWeightDelta Float?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model DietaryPreference {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        String
-  value       String
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  value     String
+  createdAt DateTime @default(now())
 
   @@unique([userId, type, value])
   @@index([userId, type])
 }
 
 model NutritionFact {
-  id            String   @id @default(cuid())
-  calories      Float
-  proteinGrams  Float
-  carbsGrams    Float
-  fatGrams      Float
-  fibreGrams    Float?
-  sugarGrams    Float?
-  sodiumMg      Float?
-  servingSize   Float?
-  servingUnit   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  foods         Food[]
-  brandedFoods  BrandedFood[]
-  recipes       Recipe[]
-  mealLogItems  MealLogItem[]
+  id           String        @id @default(cuid())
+  calories     Float
+  proteinGrams Float
+  carbsGrams   Float
+  fatGrams     Float
+  fibreGrams   Float?
+  sugarGrams   Float?
+  sodiumMg     Float?
+  servingSize  Float?
+  servingUnit  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  foods        Food[]
+  brandedFoods BrandedFood[]
+  recipes      Recipe[]
+  mealLogItems MealLogItem[]
 }
 
 model Food {
-  id               String         @id @default(cuid())
-  slug             String         @unique
-  name             String
-  brand            String?
-  category         String?
-  searchVector     String?
-  nutritionFactId  String
-  nutritionFact    NutritionFact  @relation(fields: [nutritionFactId], references: [id])
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  brandedFoods     BrandedFood[]
-  favouritedBy     Favourite[]
-  mealLogItems     MealLogItem[]
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  brand           String?
+  category        String?
+  searchVector    String?
+  nutritionFactId String
+  nutritionFact   NutritionFact @relation(fields: [nutritionFactId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  brandedFoods    BrandedFood[]
+  favouritedBy    Favourite[]
+  mealLogItems    MealLogItem[]
 
   @@index([name])
   @@index([category])
 }
 
 model BrandedFood {
-  id               String         @id @default(cuid())
-  foodId           String?
-  food             Food?          @relation(fields: [foodId], references: [id])
-  barcode          String         @unique
-  brandName        String
-  productName      String
-  nutritionFactId  String
-  nutritionFact    NutritionFact  @relation(fields: [nutritionFactId], references: [id])
-  source           String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id              String        @id @default(cuid())
+  foodId          String?
+  food            Food?         @relation(fields: [foodId], references: [id])
+  barcode         String        @unique
+  brandName       String
+  productName     String
+  nutritionFactId String
+  nutritionFact   NutritionFact @relation(fields: [nutritionFactId], references: [id])
+  source          String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
   @@index([productName, brandName])
 }
 
 model Recipe {
-  id               String              @id @default(cuid())
-  userId           String?
-  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  title            String
-  description      String?
-  servings         Int                 @default(1)
-  sourceText       String?
-  aiConfidence     Float?
-  nutritionFactId  String
-  nutritionFact    NutritionFact       @relation(fields: [nutritionFactId], references: [id])
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
-  favouritedBy     Favourite[]
-  ingredients      RecipeIngredient[]
-  mealLogItems     MealLogItem[]
+  id              String             @id @default(cuid())
+  userId          String?
+  user            User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  servings        Int                @default(1)
+  sourceText      String?
+  aiConfidence    Float?
+  nutritionFactId String
+  nutritionFact   NutritionFact      @relation(fields: [nutritionFactId], references: [id])
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  favouritedBy    Favourite[]
+  ingredients     RecipeIngredient[]
+  mealLogItems    MealLogItem[]
 }
 
 model RecipeIngredient {
-  id                String   @id @default(cuid())
-  recipeId          String
-  recipe            Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  rawText           String
-  ingredientName    String
-  amount            Float?
-  unit              String?
-  gramsEstimate     Float?
-  caloriesEstimate  Float?
-  confidence        Float?
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  recipeId         String
+  recipe           Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  rawText          String
+  ingredientName   String
+  amount           Float?
+  unit             String?
+  gramsEstimate    Float?
+  caloriesEstimate Float?
+  confidence       Float?
+  createdAt        DateTime @default(now())
 
   @@index([recipeId])
 }
@@ -245,18 +275,18 @@ model MealLog {
 }
 
 model MealLogItem {
-  id               String         @id @default(cuid())
-  mealLogId        String
-  mealLog          MealLog        @relation(fields: [mealLogId], references: [id], onDelete: Cascade)
-  foodId           String?
-  food             Food?          @relation(fields: [foodId], references: [id], onDelete: SetNull)
-  recipeId         String?
-  recipe           Recipe?        @relation(fields: [recipeId], references: [id], onDelete: SetNull)
-  nutritionFactId  String
-  nutritionFact    NutritionFact  @relation(fields: [nutritionFactId], references: [id])
-  portionCount     Float          @default(1)
-  displayName      String
-  createdAt        DateTime       @default(now())
+  id              String        @id @default(cuid())
+  mealLogId       String
+  mealLog         MealLog       @relation(fields: [mealLogId], references: [id], onDelete: Cascade)
+  foodId          String?
+  food            Food?         @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  recipeId        String?
+  recipe          Recipe?       @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  nutritionFactId String
+  nutritionFact   NutritionFact @relation(fields: [nutritionFactId], references: [id])
+  portionCount    Float         @default(1)
+  displayName     String
+  createdAt       DateTime      @default(now())
 
   @@index([mealLogId])
   @@index([foodId])
@@ -264,131 +294,131 @@ model MealLogItem {
 }
 
 model Favourite {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  foodId     String?
-  food       Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
-  recipeId   String?
-  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodId    String?
+  food      Food?    @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  recipeId  String?
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
 
   @@unique([userId, foodId, recipeId])
   @@index([userId, createdAt])
 }
 
 model Workout {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title         String
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
   caloriesBurned Float?
-  durationMin   Int?
-  performedAt   DateTime
-  notes         String?
-  createdAt     DateTime @default(now())
+  durationMin    Int?
+  performedAt    DateTime
+  notes          String?
+  createdAt      DateTime @default(now())
 
   @@index([userId, performedAt])
 }
 
 model ProgressEntry {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  weightKg     Float?
-  bodyFatPct   Float?
-  mood         String?
-  note         String?
-  recordedAt   DateTime
-  createdAt    DateTime @default(now())
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg   Float?
+  bodyFatPct Float?
+  mood       String?
+  note       String?
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
 
   @@index([userId, recordedAt])
 }
 
 model Reminder {
-  id            String       @id @default(cuid())
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type          ReminderType
-  title         String
-  body          String
-  scheduleCron  String
-  timezone      String       @default("Europe/London")
-  isEnabled     Boolean      @default(true)
-  deliveryCount Int          @default(0)
-  lastSentAt    DateTime?
-  lastAttemptAt DateTime?
+  id                String       @id @default(cuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              ReminderType
+  title             String
+  body              String
+  scheduleCron      String
+  timezone          String       @default("Europe/London")
+  isEnabled         Boolean      @default(true)
+  deliveryCount     Int          @default(0)
+  lastSentAt        DateTime?
+  lastAttemptAt     DateTime?
   lastAttemptStatus String?
-  lastErrorMessage String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  lastErrorMessage  String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   @@index([userId, isEnabled])
 }
 
 model Challenge {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
-  slug        String    @unique
+  slug        String   @unique
   description String
   startsAt    DateTime
   endsAt      DateTime
   badgeId     String?
-  badge       Badge?    @relation(fields: [badgeId], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
+  badge       Badge?   @relation(fields: [badgeId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
 }
 
 model Badge {
-  id          String     @id @default(cuid())
-  slug        String     @unique
+  id          String      @id @default(cuid())
+  slug        String      @unique
   name        String
   description String
   icon        String?
-  createdAt   DateTime   @default(now())
+  createdAt   DateTime    @default(now())
   users       UserBadge[]
   challenges  Challenge[]
 }
 
 model UserBadge {
-  id         String   @id @default(cuid())
-  userId     String
-  badgeId    String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
-  earnedAt   DateTime @default(now())
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now())
 
   @@unique([userId, badgeId])
 }
 
 model InfluencerContent {
-  id           String      @id @default(cuid())
-  slug         String      @unique
-  title        String
-  summary      String
-  contentType  ContentType
-  authorName   String
-  coverImage   String?
-  body         String
-  publishedAt  DateTime?
-  isPremium    Boolean     @default(false)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id          String      @id @default(cuid())
+  slug        String      @unique
+  title       String
+  summary     String
+  contentType ContentType
+  authorName  String
+  coverImage  String?
+  body        String
+  publishedAt DateTime?
+  isPremium   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@index([contentType, publishedAt])
 }
 
 model SyncMutation {
-  id                String     @id @default(cuid())
-  userId            String
-  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clientMutationId  String
-  entityType        String
-  operation         String
-  payloadJson       Json
-  status            SyncStatus @default(pending)
-  errorMessage      String?
-  createdAt         DateTime   @default(now())
-  appliedAt         DateTime?
+  id               String     @id @default(cuid())
+  userId           String
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientMutationId String
+  entityType       String
+  operation        String
+  payloadJson      Json
+  status           SyncStatus @default(pending)
+  errorMessage     String?
+  createdAt        DateTime   @default(now())
+  appliedAt        DateTime?
 
   @@unique([userId, clientMutationId])
   @@index([userId, status, createdAt])

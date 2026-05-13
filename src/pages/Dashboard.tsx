@@ -1,21 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { Check, ChevronLeft, ChevronRight, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import AppLogo from "@/components/AppLogo";
 import { AppPage, SectionCard } from "@/components/app/AppPage";
 import { CalorieRing } from "@/components/CalorieRing";
 import { MacroBar } from "@/components/MacroBar";
 import { MealCard } from "@/components/MealCard";
-import { deleteMealLog, getDashboard, type DashboardMeal } from "@/lib/api";
-import {
-  getManualFoodLogDate,
-  type ManualFoodLog,
-  readManualFoodLogs,
-  removeManualFoodLogById,
-  writeManualFoodLogs,
-} from "@/lib/manual-food-logs";
-import { MealType, shiftDateKey, useApp } from "@/context/AppContext";
+import { deleteMealLog, getDashboard, updateMealLog, type DashboardMeal } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { MealType, MEAL_LABELS, shiftDateKey, useApp } from "@/context/AppContext";
 
 const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"];
 
@@ -58,29 +52,22 @@ function DashboardFallback({ onRetry, message }: { onRetry: () => void; message:
   );
 }
 
-function mapManualFoodLogToDashboardMeal(log: ManualFoodLog): DashboardMeal {
-  return {
-    id: log.id,
-    mealType: log.meal,
-    consumedAt: log.createdAt,
-    totalCalories: log.calories ?? 0,
-    totalProtein: log.protein ?? 0,
-    totalCarbs: log.carbs ?? 0,
-    totalFat: log.fat ?? 0,
-    totalFibre: log.fiber ?? 0,
-    itemCount: 1,
-    itemNames: [
-      [log.foodName, log.amount ? `(${log.amount})` : null, log.grams !== null ? `${Math.round(log.grams)}g` : null]
-        .filter(Boolean)
-        .join(" "),
-    ],
-  };
+function formatTimeInput(timestamp: string) {
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function combineDateAndTime(dateKey: string, time: string) {
+  const safeTime = /^\d{2}:\d{2}$/.test(time) ? time : "12:00";
+  return new Date(`${dateKey}T${safeTime}:00`).toISOString();
 }
 
 export default function Dashboard() {
   const { currentDate, setCurrentDate, uiMode, isBackendReady, isBootstrapping, retryBackendConnection } = useApp();
   const queryClient = useQueryClient();
-  const [manualFoodLogs, setManualFoodLogs] = useState<ManualFoodLog[]>(() => readManualFoodLogs());
+  const [editingMeal, setEditingMeal] = useState<DashboardMeal | null>(null);
+  const [editMealType, setEditMealType] = useState<MealType>("breakfast");
+  const [editTime, setEditTime] = useState("12:00");
 
   const dashboardQuery = useQuery({
     queryKey: ["dashboard", currentDate],
@@ -88,21 +75,6 @@ export default function Dashboard() {
     enabled: isBackendReady,
   });
   const todayKey = getTodayKey();
-
-  useEffect(() => {
-    const syncManualFoodLogs = () => {
-      setManualFoodLogs(readManualFoodLogs());
-    };
-
-    syncManualFoodLogs();
-    window.addEventListener("manualFoodLogsUpdated", syncManualFoodLogs);
-    window.addEventListener("storage", syncManualFoodLogs);
-
-    return () => {
-      window.removeEventListener("manualFoodLogsUpdated", syncManualFoodLogs);
-      window.removeEventListener("storage", syncManualFoodLogs);
-    };
-  }, [currentDate]);
 
   const deleteMutation = useMutation({
     mutationFn: deleteMealLog,
@@ -116,27 +88,34 @@ export default function Dashboard() {
     },
   });
 
-  const manualLogsForDate = useMemo(
-    () => manualFoodLogs.filter((log) => getManualFoodLogDate(log) === currentDate),
-    [currentDate, manualFoodLogs],
-  );
-  const manualMeals = useMemo(() => manualLogsForDate.map(mapManualFoodLogToDashboardMeal), [manualLogsForDate]);
-  const manualCalories = manualMeals.reduce((sum, meal) => sum + meal.totalCalories, 0);
-  const manualProtein = manualMeals.reduce((sum, meal) => sum + meal.totalProtein, 0);
-  const manualCarbs = manualMeals.reduce((sum, meal) => sum + meal.totalCarbs, 0);
-  const manualFat = manualMeals.reduce((sum, meal) => sum + meal.totalFat, 0);
+  const updateMutation = useMutation({
+    mutationFn: (payload: { mealId: string; mealType: MealType; time: string }) =>
+      updateMealLog(payload.mealId, {
+        mealType: payload.mealType,
+        consumedAt: combineDateAndTime(currentDate, payload.time),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard", currentDate] });
+      setEditingMeal(null);
+      toast.success("Meal updated.");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Could not update meal.");
+    },
+  });
+
   const dashboard = dashboardQuery.data;
   const calorieGoal = dashboard?.goal?.calories ?? 2200;
   const proteinGoal = dashboard?.goal?.protein ?? 150;
   const carbsGoal = dashboard?.goal?.carbs ?? 220;
   const fatGoal = dashboard?.goal?.fat ?? 70;
-  const dailyCalories = (dashboard?.daily.calories ?? 0) + manualCalories;
-  const dailyProtein = (dashboard?.daily.protein ?? 0) + manualProtein;
-  const dailyCarbs = (dashboard?.daily.carbs ?? 0) + manualCarbs;
-  const dailyFat = (dashboard?.daily.fat ?? 0) + manualFat;
-  const mealCount = (dashboard?.mealCount ?? 0) + manualMeals.length;
+  const dailyCalories = dashboard?.daily.calories ?? 0;
+  const dailyProtein = dashboard?.daily.protein ?? 0;
+  const dailyCarbs = dashboard?.daily.carbs ?? 0;
+  const dailyFat = dashboard?.daily.fat ?? 0;
+  const mealCount = dashboard?.mealCount ?? 0;
   const remainingCalories = Math.max(Math.round(calorieGoal - dailyCalories), 0);
-  const allMeals = [...(dashboard?.meals ?? []), ...manualMeals].sort(
+  const allMeals = [...(dashboard?.meals ?? [])].sort(
     (first, second) => new Date(second.consumedAt).getTime() - new Date(first.consumedAt).getTime(),
   );
   const groupedMeals = mealTypes.reduce<Record<MealType, DashboardMeal[]>>(
@@ -152,21 +131,14 @@ export default function Dashboard() {
     },
   );
 
-  const deleteManualFoodLog = (logId: string) => {
-    const log = manualFoodLogs.find((item) => item.id === logId);
-    const nextLogs = removeManualFoodLogById(manualFoodLogs, logId);
-    setManualFoodLogs(nextLogs);
-    writeManualFoodLogs(nextLogs);
-    toast.success(log ? `${log.foodName} removed.` : "Manual food removed.");
+  const handleDeleteMeal = (mealId: string) => {
+    deleteMutation.mutate(mealId);
   };
 
-  const handleDeleteMeal = (mealId: string) => {
-    if (mealId.startsWith("manual-food-")) {
-      deleteManualFoodLog(mealId);
-      return;
-    }
-
-    deleteMutation.mutate(mealId);
+  const handleEditMeal = (meal: DashboardMeal) => {
+    setEditingMeal(meal);
+    setEditMealType(meal.mealType);
+    setEditTime(formatTimeInput(meal.consumedAt));
   };
 
   return (
@@ -268,12 +240,78 @@ export default function Dashboard() {
                 key={mealType}
                 mealType={mealType}
                 entries={groupedMeals[mealType]}
+                onEdit={handleEditMeal}
                 onDelete={handleDeleteMeal}
-                isMutating={deleteMutation.isPending}
+                isMutating={deleteMutation.isPending || updateMutation.isPending}
               />
             ))}
           </div>
         </>
+      ) : null}
+
+      {editingMeal ? (
+        <div className="fixed inset-x-4 bottom-24 z-40 rounded-[28px] border border-border/80 bg-card/95 p-4 shadow-[0_34px_70px_-36px_rgb(0_0_0/0.75)] backdrop-blur-xl sm:mx-auto sm:max-w-md">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary/60">Edit meal</p>
+              <h2 className="display-font mt-1 truncate text-xl font-bold text-foreground">
+                {editingMeal.itemCount === 1 ? editingMeal.itemNames[0] : `${editingMeal.itemCount} foods`}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingMeal(null)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground hover:bg-secondary"
+              aria-label="Close meal editor"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <div className="grid grid-cols-4 gap-2">
+              {mealTypes.map((mealType) => (
+                <button
+                  key={mealType}
+                  type="button"
+                  onClick={() => setEditMealType(mealType)}
+                  className={`min-h-11 rounded-2xl border px-2 text-xs font-semibold ${
+                    editMealType === mealType
+                      ? "border-primary bg-primary text-primary-foreground shadow-[var(--shadow-button)]"
+                      : "border-border/80 bg-surface-elevated/60 text-foreground"
+                  }`}
+                >
+                  {MEAL_LABELS[mealType]}
+                </button>
+              ))}
+            </div>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-primary/70">Time</span>
+              <Input
+                type="time"
+                value={editTime}
+                onChange={(event) => setEditTime(event.target.value)}
+                className="h-12 border-border/80 bg-surface-elevated/80"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              updateMutation.mutate({
+                mealId: editingMeal.id,
+                mealType: editMealType,
+                time: editTime,
+              })
+            }
+            disabled={updateMutation.isPending}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-button)] disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <Check className="h-4 w-4" />
+            Save meal
+          </button>
+        </div>
       ) : null}
     </AppPage>
   );

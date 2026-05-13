@@ -1,15 +1,21 @@
 import { Router } from "express";
 import { asyncHandler } from "../../lib/async-handler";
 import { requireAuth } from "../../middleware/auth";
-import { validateBody, validateQuery } from "../../middleware/validate";
+import { validateBody, validateParams, validateQuery } from "../../middleware/validate";
 import { foodsController } from "./foods.controller";
-import { favouriteMutationSchema, importFoodSchema, searchFoodsQuerySchema } from "./foods.validators";
+import {
+  barcodeParamSchema,
+  favouriteMutationSchema,
+  importFoodSchema,
+  searchFoodsQuerySchema,
+  usdaFoodParamSchema
+} from "./foods.validators";
 
 export const foodsRouter = Router();
 
 foodsRouter.get("/search", validateQuery(searchFoodsQuerySchema), asyncHandler(foodsController.search.bind(foodsController)));
-foodsRouter.get("/barcode/:barcode", asyncHandler(foodsController.barcodeLookup.bind(foodsController)));
-foodsRouter.get("/usda/:fdcId", asyncHandler(foodsController.usdaFoodDetail.bind(foodsController)));
+foodsRouter.get("/barcode/:barcode", validateParams(barcodeParamSchema), asyncHandler(foodsController.barcodeLookup.bind(foodsController)));
+foodsRouter.get("/usda/:fdcId", validateParams(usdaFoodParamSchema), asyncHandler(foodsController.usdaFoodDetail.bind(foodsController)));
 
 foodsRouter.use(requireAuth);
 foodsRouter.post("/import", validateBody(importFoodSchema), asyncHandler(foodsController.importFood.bind(foodsController)));

@@ -1,6 +1,5 @@
 import type { MealType } from "@/context/AppContext";
 
-export const MANUAL_FOOD_LOGS_KEY = "manualFoodLogs";
 export const MANUAL_SAVED_FOODS_KEY = "manualSavedFoods";
 export const MANUAL_SAVED_FOOD_LIMIT = 10;
 
@@ -33,10 +32,6 @@ export type ManualSavedFood = {
   lastUsedAt: string;
 };
 
-function isMealType(value: unknown): value is MealType {
-  return value === "breakfast" || value === "lunch" || value === "dinner" || value === "snack";
-}
-
 function normaliseText(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -47,37 +42,6 @@ function createManualFoodId() {
   }
 
   return `manual-food-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function fallbackDateFromTimestamp(timestamp: string) {
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  return date.toISOString().slice(0, 10);
-}
-
-function isManualFoodLog(value: unknown): value is ManualFoodLog {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const item = value as Partial<ManualFoodLog>;
-  return (
-    typeof item.id === "string" &&
-    typeof item.foodName === "string" &&
-    typeof item.amount === "string" &&
-    (item.grams === undefined || item.grams === null || typeof item.grams === "number") &&
-    (item.calories === null || typeof item.calories === "number") &&
-    (item.protein === undefined || item.protein === null || typeof item.protein === "number") &&
-    (item.carbs === undefined || item.carbs === null || typeof item.carbs === "number") &&
-    (item.fat === undefined || item.fat === null || typeof item.fat === "number") &&
-    (item.fiber === undefined || item.fiber === null || typeof item.fiber === "number") &&
-    isMealType(item.meal) &&
-    typeof item.createdAt === "string" &&
-    (item.date === undefined || typeof item.date === "string")
-  );
 }
 
 function isManualSavedFood(value: unknown): value is ManualSavedFood {
@@ -101,25 +65,6 @@ function isManualSavedFood(value: unknown): value is ManualSavedFood {
   );
 }
 
-export function getManualFoodLogDate(log: ManualFoodLog) {
-  return log.date ?? fallbackDateFromTimestamp(log.createdAt);
-}
-
-export function getManualFoodLogKey(log: ManualFoodLog) {
-  return [
-    getManualFoodLogDate(log),
-    log.meal,
-    normaliseText(log.foodName),
-    normaliseText(log.amount),
-    log.grams ?? "",
-    log.calories ?? "",
-    log.protein ?? "",
-    log.carbs ?? "",
-    log.fat ?? "",
-    log.fiber ?? "",
-  ].join("::");
-}
-
 export function getManualFoodRecentKey(food: Pick<ManualFoodLog, "foodName" | "amount" | "grams" | "calories" | "protein" | "carbs" | "fat" | "fiber">) {
   return [
     normaliseText(food.foodName),
@@ -133,82 +78,19 @@ export function getManualFoodRecentKey(food: Pick<ManualFoodLog, "foodName" | "a
   ].join("::");
 }
 
-export function readManualFoodLogs(): ManualFoodLog[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const stored = window.localStorage.getItem(MANUAL_FOOD_LOGS_KEY);
-    if (!stored) {
-      return [];
-    }
-
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.filter(isManualFoodLog).map((log) => ({
-      ...log,
-      grams: log.grams ?? null,
-      protein: log.protein ?? null,
-      carbs: log.carbs ?? null,
-      fat: log.fat ?? null,
-      fiber: log.fiber ?? null,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export function writeManualFoodLogs(logs: ManualFoodLog[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(MANUAL_FOOD_LOGS_KEY, JSON.stringify(logs));
-  window.dispatchEvent(new Event("manualFoodLogsUpdated"));
-}
-
 export function readManualSavedFoods(): ManualSavedFood[] {
   if (typeof window === "undefined") {
     return [];
   }
 
-  try {
-    const stored = window.localStorage.getItem(MANUAL_SAVED_FOODS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      return Array.isArray(parsed)
-        ? parsed
-            .filter(isManualSavedFood)
-            .map((food) => ({
-              ...food,
-              grams: food.grams ?? null,
-              protein: food.protein ?? null,
-              carbs: food.carbs ?? null,
-              fat: food.fat ?? null,
-              fiber: food.fiber ?? null,
-            }))
-            .slice(0, MANUAL_SAVED_FOOD_LIMIT)
-        : [];
-    }
+  window.localStorage.removeItem(MANUAL_SAVED_FOODS_KEY);
 
-    return getRecentManualFoodLogs(readManualFoodLogs()).map((log) => ({
-      id: `manual-saved-${log.id}`,
-      foodName: log.foodName,
-      amount: log.amount,
-      grams: log.grams,
-      calories: log.calories,
-      protein: log.protein,
-      carbs: log.carbs,
-      fat: log.fat,
-      fiber: log.fiber,
-      createdAt: log.createdAt,
-      lastUsedAt: log.createdAt,
-    }));
+  try {
+    const raw = window.sessionStorage.getItem(MANUAL_SAVED_FOODS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isManualSavedFood).slice(0, MANUAL_SAVED_FOOD_LIMIT) : [];
   } catch {
+    window.sessionStorage.removeItem(MANUAL_SAVED_FOODS_KEY);
     return [];
   }
 }
@@ -218,7 +100,11 @@ export function writeManualSavedFoods(foods: ManualSavedFood[]) {
     return;
   }
 
-  window.localStorage.setItem(MANUAL_SAVED_FOODS_KEY, JSON.stringify(foods.slice(0, MANUAL_SAVED_FOOD_LIMIT)));
+  window.localStorage.removeItem(MANUAL_SAVED_FOODS_KEY);
+  window.sessionStorage.setItem(
+    MANUAL_SAVED_FOODS_KEY,
+    JSON.stringify(foods.filter(isManualSavedFood).slice(0, MANUAL_SAVED_FOOD_LIMIT)),
+  );
 }
 
 export function createManualFoodLog(input: {
@@ -301,19 +187,6 @@ export function parseManualOptionalNumber(value: string) {
   };
 }
 
-export function hasManualFoodLogDuplicate(logs: ManualFoodLog[], log: ManualFoodLog) {
-  const key = getManualFoodLogKey(log);
-  return logs.some((currentLog) => getManualFoodLogKey(currentLog) === key);
-}
-
-export function addManualFoodLog(logs: ManualFoodLog[], log: ManualFoodLog) {
-  return [log, ...logs];
-}
-
-export function removeManualFoodLogById(logs: ManualFoodLog[], id: string) {
-  return logs.filter((log) => log.id !== id);
-}
-
 export function upsertManualSavedFood(foods: ManualSavedFood[], food: ManualSavedFood) {
   const key = getManualFoodRecentKey(food);
   const existing = foods.find((savedFood) => getManualFoodRecentKey(savedFood) === key);
@@ -329,17 +202,4 @@ export function upsertManualSavedFood(foods: ManualSavedFood[], food: ManualSave
 
 export function removeManualSavedFoodById(foods: ManualSavedFood[], id: string) {
   return foods.filter((food) => food.id !== id);
-}
-
-export function getRecentManualFoodLogs(logs: ManualFoodLog[]) {
-  const recentLogs = new Map<string, ManualFoodLog>();
-
-  logs.forEach((log) => {
-    const key = getManualFoodRecentKey(log);
-    if (!recentLogs.has(key)) {
-      recentLogs.set(key, log);
-    }
-  });
-
-  return Array.from(recentLogs.values());
 }

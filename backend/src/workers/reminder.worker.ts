@@ -33,12 +33,10 @@ const worker = new Worker(
     }
 
     try {
-      // TODO: replace this with real push/email delivery.
       logger.info(
         {
           reminderId,
-          userId: reminder.userId,
-          title: reminder.title
+          userId: reminder.userId
         },
         "Reminder dispatched"
       );

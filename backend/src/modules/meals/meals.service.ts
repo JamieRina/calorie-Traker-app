@@ -16,6 +16,12 @@ export type CreateMealInput = {
   items: Array<{ foodId?: string; recipeId?: string; portionCount?: number }>;
 };
 
+export type UpdateMealInput = {
+  consumedAt?: string;
+  mealType?: MealType;
+  notes?: string | null;
+};
+
 export class MealsService {
   async createMeal(userId: string, input: CreateMealInput, db: MealsDbClient = prisma) {
     return withLocalFallback<MealRecord>(
@@ -48,8 +54,11 @@ export class MealsService {
           }
 
           if (item.recipeId) {
-            const recipe = await db.recipe.findUnique({
-              where: { id: item.recipeId },
+            const recipe = await db.recipe.findFirst({
+              where: {
+                id: item.recipeId,
+                OR: [{ userId }, { userId: null }]
+              },
               include: { nutritionFact: true }
             });
 
@@ -131,6 +140,42 @@ export class MealsService {
         });
       },
       async () => localBackend.getDailyMeals(userId, date)
+    );
+  }
+
+  async updateMeal(userId: string, mealId: string, input: UpdateMealInput) {
+    return withLocalFallback<MealRecord>(
+      "meals.update",
+      async () => {
+        const meal = await prisma.mealLog.findFirst({
+          where: {
+            id: mealId,
+            userId
+          }
+        });
+
+        if (!meal) {
+          throw new ApiError(404, "Meal not found");
+        }
+
+        return prisma.mealLog.update({
+          where: { id: mealId },
+          data: {
+            consumedAt: input.consumedAt ? new Date(input.consumedAt) : undefined,
+            mealType: input.mealType,
+            notes: input.notes
+          },
+          include: {
+            items: {
+              include: {
+                food: { include: { nutritionFact: true } },
+                recipe: { include: { nutritionFact: true } }
+              }
+            }
+          }
+        });
+      },
+      async () => localBackend.updateMeal(userId, mealId, input)
     );
   }
 

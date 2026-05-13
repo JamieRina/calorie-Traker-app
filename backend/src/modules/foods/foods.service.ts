@@ -471,8 +471,11 @@ export class FoodsService {
         }
 
         if (recipeId) {
-          const recipe = await prisma.recipe.findUnique({
-            where: { id: recipeId }
+          const recipe = await prisma.recipe.findFirst({
+            where: {
+              id: recipeId,
+              OR: [{ userId }, { userId: null }]
+            }
           });
           if (!recipe) {
             throw new ApiError(404, "Recipe not found");
@@ -533,7 +536,19 @@ export class FoodsService {
       "foods.listFavourites",
       async () =>
         prisma.favourite.findMany({
-          where: { userId },
+          where: {
+            userId,
+            OR: [
+              { foodId: { not: null } },
+              {
+                recipe: {
+                  is: {
+                    OR: [{ userId }, { userId: null }]
+                  }
+                }
+              }
+            ]
+          },
           include: {
             food: {
               include: { nutritionFact: true }

@@ -1,4 +1,4 @@
-import { ActivityLevel, GoalType, Sex, type ActivityLevel as ActivityLevelValue, type GoalType as GoalTypeValue, type Sex as SexValue } from "../lib/domain-enums";
+import { type ActivityLevel as ActivityLevelValue, type GoalType as GoalTypeValue, type Sex as SexValue } from "../lib/domain-enums";
 
 type GoalInput = {
   sex: SexValue;

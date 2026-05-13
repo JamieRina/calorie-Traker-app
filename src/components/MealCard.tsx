@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { type DashboardMeal } from "@/lib/api";
 import { MealType, MEAL_LABELS } from "@/context/AppContext";
@@ -6,6 +6,7 @@ import { MealType, MEAL_LABELS } from "@/context/AppContext";
 interface MealCardProps {
   mealType: MealType;
   entries: DashboardMeal[];
+  onEdit?: (meal: DashboardMeal) => void;
   onDelete: (mealId: string) => void;
   isMutating?: boolean;
 }
@@ -17,7 +18,7 @@ function formatTime(timestamp: string) {
   }).format(new Date(timestamp));
 }
 
-export function MealCard({ mealType, entries, onDelete, isMutating = false }: MealCardProps) {
+export function MealCard({ mealType, entries, onEdit, onDelete, isMutating = false }: MealCardProps) {
   const navigate = useNavigate();
   const totalCalories = entries.reduce((sum, item) => sum + item.totalCalories, 0);
 
@@ -63,14 +64,26 @@ export function MealCard({ mealType, entries, onDelete, isMutating = false }: Me
                   {formatTime(entry.consumedAt)} / {Math.round(entry.totalCalories)} kcal
                 </p>
               </div>
-              <button
-                onClick={() => onDelete(entry.id)}
-                disabled={isMutating}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={`Remove ${entry.itemNames[0] ?? "meal"}`}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex shrink-0 gap-1">
+                {onEdit ? (
+                  <button
+                    onClick={() => onEdit(entry)}
+                    disabled={isMutating}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={`Edit ${entry.itemNames[0] ?? "meal"}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => onDelete(entry.id)}
+                  disabled={isMutating}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label={`Remove ${entry.itemNames[0] ?? "meal"}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))
         )}

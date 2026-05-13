@@ -4,7 +4,8 @@ import { env } from "../config/env";
 
 export function signAccessToken(payload: { sub: string; email: string }) {
   const options: SignOptions = {
-    expiresIn: env.JWT_ACCESS_TTL as SignOptions["expiresIn"]
+    expiresIn: env.JWT_ACCESS_TTL as SignOptions["expiresIn"],
+    jwtid: crypto.randomUUID()
   };
 
   return jwt.sign(payload, env.JWT_ACCESS_SECRET as Secret, options);
@@ -12,7 +13,8 @@ export function signAccessToken(payload: { sub: string; email: string }) {
 
 export function signRefreshToken(payload: { sub: string; email: string }) {
   const options: SignOptions = {
-    expiresIn: env.JWT_REFRESH_TTL as SignOptions["expiresIn"]
+    expiresIn: env.JWT_REFRESH_TTL as SignOptions["expiresIn"],
+    jwtid: crypto.randomUUID()
   };
 
   return jwt.sign(payload, env.JWT_REFRESH_SECRET as Secret, options);

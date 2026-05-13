@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import bcrypt from "bcryptjs";
@@ -172,6 +172,25 @@ type LocalBackendStore = {
     recipeId: string | null;
     createdAt: string;
   }>;
+  passwordResetTokens: Array<{
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+    consumedAt: string | null;
+    createdAt: string;
+  }>;
+  emailVerificationTokens: Array<{
+    id: string;
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+    consumedAt: string | null;
+    resendCount: number;
+    verifyAttemptCount: number;
+    lastSentAt: string;
+    createdAt: string;
+  }>;
   meals: LocalMealLog[];
   workouts: LocalWorkout[];
   progressEntries: LocalProgressEntry[];
@@ -209,6 +228,12 @@ type CreateMealInput = {
   mealType: MealTypeValue;
   notes?: string;
   items: Array<{ foodId?: string; recipeId?: string; portionCount?: number }>;
+};
+
+type UpdateMealInput = {
+  consumedAt?: string;
+  mealType?: MealTypeValue;
+  notes?: string | null;
 };
 
 type CreateWorkoutInput = {
@@ -252,6 +277,10 @@ function nowIso() {
 
 function createId(prefix: string) {
   return `${prefix}_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+}
+
+function hashValue(value: string) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function createNutritionFact(input: {
@@ -363,6 +392,8 @@ function createEmptyStore(): LocalBackendStore {
     foods: createSeedFoods(),
     brandedFoods: [],
     favourites: [],
+    passwordResetTokens: [],
+    emailVerificationTokens: [],
     meals: [],
     workouts: [],
     progressEntries: []
@@ -390,6 +421,9 @@ function readStore(): LocalBackendStore {
       parsed.foods = createSeedFoods();
       writeStore(parsed);
     }
+
+    parsed.passwordResetTokens ??= [];
+    parsed.emailVerificationTokens ??= [];
 
     return parsed;
   } catch (error) {
@@ -524,16 +558,23 @@ function sortByDateDesc<T>(items: T[], selector: (item: T) => string) {
 }
 
 export class LocalBackendStoreService {
-  async register(email: string, password: string, displayName: string) {
-    const existingUser = queryStore((store) => store.users.find((entry) => entry.email === email));
-    if (existingUser) {
-      throw new ApiError(409, "An account with that email already exists");
-    }
-
+  async createPendingRegistration(email: string, password: string, displayName: string) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     return mutateStore((store) => {
+      const existingUser = store.users.find((entry) => entry.email === email);
       const timestamp = nowIso();
+
+      if (existingUser) {
+        if (!existingUser.isEmailVerified) {
+          existingUser.passwordHash = passwordHash;
+          existingUser.displayName = displayName;
+          existingUser.updatedAt = timestamp;
+        }
+
+        return existingUser;
+      }
+
       const userId = createId("user");
 
       store.users.push({
@@ -566,9 +607,17 @@ export class LocalBackendStoreService {
       return {
         id: userId,
         email,
-        displayName
+        passwordHash,
+        displayName,
+        isEmailVerified: false,
+        createdAt: timestamp,
+        updatedAt: timestamp
       };
     });
+  }
+
+  async register(email: string, password: string, displayName: string) {
+    return this.createPendingRegistration(email, password, displayName);
   }
 
   async login(email: string, password: string) {
@@ -587,6 +636,151 @@ export class LocalBackendStoreService {
 
   getUserById(userId: string) {
     return queryStore((store) => store.users.find((entry) => entry.id === userId) ?? null);
+  }
+
+  getUserByEmail(email: string) {
+    return queryStore((store) => store.users.find((entry) => entry.email === email) ?? null);
+  }
+
+  createEmailVerificationToken(input: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+    resendCount: number;
+  }) {
+    return mutateStore((store) => {
+      const timestamp = nowIso();
+      const token = {
+        id: createId("verify"),
+        userId: input.userId,
+        tokenHash: input.tokenHash,
+        expiresAt: input.expiresAt,
+        consumedAt: null,
+        resendCount: input.resendCount,
+        verifyAttemptCount: 0,
+        lastSentAt: timestamp,
+        createdAt: timestamp
+      };
+
+      store.emailVerificationTokens.push(token);
+      return token;
+    });
+  }
+
+  getLatestEmailVerificationToken(userId: string, shouldThrow = true) {
+    const token = queryStore((store) =>
+      store.emailVerificationTokens
+        .filter((entry) => entry.userId === userId && !entry.consumedAt)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null
+    );
+
+    if (!token && shouldThrow) {
+      throw new ApiError(400, "Verification code is invalid or expired");
+    }
+
+    return token;
+  }
+
+  incrementEmailVerificationAttempts(tokenId: string) {
+    return mutateStore((store) => {
+      const token = store.emailVerificationTokens.find((entry) => entry.id === tokenId);
+      if (token) {
+        token.verifyAttemptCount += 1;
+      }
+    });
+  }
+
+  expireEmailVerificationToken(tokenId: string) {
+    return mutateStore((store) => {
+      const token = store.emailVerificationTokens.find((entry) => entry.id === tokenId);
+      if (token) {
+        token.expiresAt = new Date(Date.now() - 1000).toISOString();
+      }
+    });
+  }
+
+  markEmailVerified(userId: string, tokenId: string) {
+    return mutateStore((store) => {
+      const timestamp = nowIso();
+      const user = getUserOrThrow(store, userId);
+      user.isEmailVerified = true;
+      user.updatedAt = timestamp;
+
+      for (const token of store.emailVerificationTokens.filter((entry) => entry.userId === userId && !entry.consumedAt)) {
+        token.consumedAt = token.id === tokenId ? timestamp : nowIso();
+      }
+    });
+  }
+
+  requestPasswordReset(email: string, ttlMinutes: number) {
+    return mutateStore((store) => {
+      const user = store.users.find((entry) => entry.email === email);
+      if (!user) {
+        return {};
+      }
+
+      const token = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
+      const timestamp = nowIso();
+
+      store.passwordResetTokens.push({
+        id: createId("reset"),
+        userId: user.id,
+        tokenHash: hashValue(token),
+        expiresAt: new Date(Date.now() + ttlMinutes * 60_000).toISOString(),
+        consumedAt: null,
+        createdAt: timestamp
+      });
+
+      return {
+        email: user.email,
+        token
+      };
+    });
+  }
+
+  async confirmPasswordReset(tokenHash: string, password: string) {
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    return mutateStore((store) => {
+      const resetToken = store.passwordResetTokens.find((entry) => entry.tokenHash === tokenHash);
+      if (!resetToken || resetToken.consumedAt || new Date(resetToken.expiresAt).getTime() < Date.now()) {
+        throw new ApiError(400, "Password reset link is invalid or expired");
+      }
+
+      const user = getUserOrThrow(store, resetToken.userId);
+      resetToken.consumedAt = nowIso();
+      user.passwordHash = passwordHash;
+      user.updatedAt = nowIso();
+
+      return { success: true };
+    });
+  }
+
+  async deleteAccount(userId: string, password: string) {
+    const user = this.getUserById(userId);
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatches) {
+      throw new ApiError(401, "Password is incorrect");
+    }
+
+    return mutateStore((store) => {
+      store.users = store.users.filter((entry) => entry.id !== userId);
+      store.profiles = store.profiles.filter((entry) => entry.userId !== userId);
+      store.goals = store.goals.filter((entry) => entry.userId !== userId);
+      store.preferences = store.preferences.filter((entry) => entry.userId !== userId);
+      store.favourites = store.favourites.filter((entry) => entry.userId !== userId);
+      store.passwordResetTokens = store.passwordResetTokens.filter((entry) => entry.userId !== userId);
+      store.emailVerificationTokens = store.emailVerificationTokens.filter((entry) => entry.userId !== userId);
+      store.meals = store.meals.filter((entry) => entry.userId !== userId);
+      store.workouts = store.workouts.filter((entry) => entry.userId !== userId);
+      store.progressEntries = store.progressEntries.filter((entry) => entry.userId !== userId);
+
+      return { success: true };
+    });
   }
 
   getProfileResponse(userId: string) {
@@ -863,6 +1057,10 @@ export class LocalBackendStoreService {
         throw new ApiError(404, "Food not found");
       }
 
+      if (recipeId) {
+        throw new ApiError(400, "Recipe favourites are not available in local mode");
+      }
+
       const existing = store.favourites.find(
         (entry) => entry.userId === userId && entry.foodId === (foodId ?? null) && entry.recipeId === (recipeId ?? null)
       );
@@ -1021,6 +1219,30 @@ export class LocalBackendStoreService {
         .sort((left, right) => left.consumedAt.localeCompare(right.consumedAt))
         .map((meal) => this.expandMeal(store, meal))
     );
+  }
+
+  updateMeal(userId: string, mealId: string, input: UpdateMealInput) {
+    return mutateStore((store) => {
+      const meal = store.meals.find((entry) => entry.id === mealId && entry.userId === userId);
+      if (!meal) {
+        throw new ApiError(404, "Meal not found");
+      }
+
+      if (input.consumedAt) {
+        meal.consumedAt = new Date(input.consumedAt).toISOString();
+      }
+
+      if (input.mealType) {
+        meal.mealType = input.mealType;
+      }
+
+      if (input.notes !== undefined) {
+        meal.notes = input.notes;
+      }
+
+      meal.updatedAt = nowIso();
+      return this.expandMeal(store, meal);
+    });
   }
 
   removeMeal(userId: string, mealId: string) {

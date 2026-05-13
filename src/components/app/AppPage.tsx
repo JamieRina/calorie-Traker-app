@@ -1,5 +1,4 @@
 import { ReactNode } from "react";
-import { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AppPageProps {
@@ -22,15 +21,6 @@ interface SectionCardProps {
   variant?: "default" | "soft" | "hero";
   className?: string;
   bodyClassName?: string;
-}
-
-interface MetricCardProps {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  detail: string;
-  tone?: "default" | "accent";
-  className?: string;
 }
 
 export function AppPage({ children }: AppPageProps) {
@@ -100,29 +90,5 @@ export function SectionCard({
       ) : null}
       <div className={cn((eyebrow || title || action) && "mt-3", bodyClassName)}>{children}</div>
     </section>
-  );
-}
-
-export function MetricCard({ icon: Icon, label, value, detail, tone = "default", className }: MetricCardProps) {
-  return (
-    <article
-      className={cn(
-        "rounded-[22px] border p-3.5 shadow-[var(--shadow-card)] backdrop-blur-xl",
-        tone === "default" && "border-border/80 bg-card/90",
-        tone === "accent" && "border-primary/20 bg-primary/[0.08]",
-        className,
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl", tone === "accent" ? "bg-primary text-primary-foreground shadow-[var(--shadow-button)]" : "bg-primary/15 text-primary")}>
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/60">{label}</p>
-          <p className="display-font mt-1 text-xl font-bold text-foreground">{value}</p>
-          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{detail}</p>
-        </div>
-      </div>
-    </article>
   );
 }

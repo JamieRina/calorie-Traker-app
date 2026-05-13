@@ -18,7 +18,14 @@ async function makeNutrition(calories: number, protein: number, carbs: number, f
 }
 
 async function main() {
-  const passwordHash = await bcrypt.hash("Password123!", 10);
+  const demoEmail = process.env.SEED_DEMO_EMAIL ?? "local-demo@example.invalid";
+  const demoPassword = process.env.SEED_DEMO_PASSWORD;
+
+  if (!demoPassword || demoPassword.length < 12) {
+    throw new Error("Set SEED_DEMO_PASSWORD to a strong temporary password before running the seed script.");
+  }
+
+  const passwordHash = await bcrypt.hash(demoPassword, 10);
 
   const chickenNutrition = await makeNutrition(165, 31, 0, 3.6, 0);
   const oatsNutrition = await makeNutrition(389, 16.9, 66.3, 6.9, 10.6);
@@ -33,10 +40,10 @@ async function main() {
   const breadNutrition = await makeNutrition(247, 13, 41, 4.2, 7);
 
   const user = await prisma.user.upsert({
-    where: { email: "demo@example.com" },
+    where: { email: demoEmail },
     update: {},
     create: {
-      email: "demo@example.com",
+      email: demoEmail,
       passwordHash,
       displayName: "Demo User",
       profile: {
@@ -206,7 +213,7 @@ async function main() {
     skipDuplicates: true
   });
 
-  console.log("Seed complete. Demo login: demo@example.com / Password123!");
+  console.log(`Seed complete. Demo user: ${demoEmail}`);
 }
 
 main()

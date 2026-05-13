@@ -6,7 +6,7 @@ import { localBackend } from "../../lib/local-backend";
 import { withLocalFallback } from "../../lib/local-fallback";
 import { type GoalRecord, type ProfileResponseRecord } from "../../lib/service-contracts";
 import { calculateCalorieGoal } from "../../utils/calorie-goal";
-import { ActivityLevel, GoalType, Sex, type ActivityLevel as ActivityLevelValue, type GoalType as GoalTypeValue, type Sex as SexValue } from "../../lib/domain-enums";
+import { ActivityLevel, Sex, type ActivityLevel as ActivityLevelValue, type GoalType as GoalTypeValue, type Sex as SexValue } from "../../lib/domain-enums";
 
 type UpsertProfileInput = {
   displayName?: string;

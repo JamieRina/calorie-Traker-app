@@ -17,7 +17,15 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isAuthBusy } = useAuth();
+
+  if (isAuthBusy && !isAuthenticated) {
+    return (
+      <div className="relative flex h-full items-center justify-center px-6 text-center">
+        <p className="text-sm font-semibold text-muted-foreground">Checking your session...</p>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Auth />;

@@ -11,6 +11,8 @@ import { errorHandler } from "./middleware/error-handler";
 import { apiRouter } from "./routes";
 
 export const app = express();
+app.set("trust proxy", 1);
+
 const localhostOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 const isAllowedOrigin = (origin?: string) => {
@@ -34,7 +36,7 @@ app.use(
         return;
       }
 
-      callback(new Error(`Origin ${origin ?? "unknown"} is not allowed by CORS`));
+      callback(new Error("Origin is not allowed by CORS"));
     },
     credentials: true
   })
@@ -47,7 +49,7 @@ app.use((request, response, next) => {
     logger.info(
       {
         method: request.method,
-        path: request.originalUrl,
+        path: request.path,
         statusCode: response.statusCode,
         durationMs: Date.now() - startedAt
       },
