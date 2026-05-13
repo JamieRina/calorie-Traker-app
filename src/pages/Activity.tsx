@@ -380,7 +380,7 @@ export default function Activity() {
         </label>
       ) : null}
 
-      <div className="rounded-[24px] border border-primary/15 bg-primary/10 p-4">
+      <div className="rounded-[24px] border border-slate-800 bg-[#020817] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">Estimated burn</p><p className="display-font mt-1 text-3xl font-bold text-foreground">{estimatedCalories} kcal</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{estimate.method}{estimate.speedKmh ? ` • ${estimate.speedKmh.toFixed(1)} km/h` : ""} • MET {estimate.met.toFixed(1)} • {Math.round(userWeightKg)} kg profile weight.</p></div>
           <button onClick={logWorkout} disabled={workoutMutation.isPending} className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground shadow-[var(--shadow-card)] transition-opacity disabled:opacity-60"><Plus className="h-4 w-4" /> Log workout</button>
@@ -404,7 +404,7 @@ export default function Activity() {
       ) : null}
 
       <SectionCard eyebrow="Log activity" title="Workout tools" description="Open detailed forms only when needed." bodyClassName="grid gap-2 sm:grid-cols-3">
-        <button onClick={() => setActiveModal("custom")} className="rounded-[22px] border border-primary/20 bg-primary/[0.08] p-4 text-left shadow-[var(--shadow-card)]"><Calculator className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Custom workout</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Time, distance, steps and intensity.</p></button>
+        <button onClick={() => setActiveModal("custom")} className="rounded-[22px] border border-border/80 bg-surface-elevated/35 p-4 text-left shadow-[var(--shadow-card)]"><Calculator className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Custom workout</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Time, distance, steps and intensity.</p></button>
         <button onClick={() => setActiveModal("library")} className="rounded-[22px] border border-border/80 bg-card/90 p-4 text-left shadow-[var(--shadow-card)]"><Dumbbell className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Exercise library</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Choose from {EXERCISES.length} exercises.</p></button>
         <button onClick={() => setActiveModal("routes")} className="rounded-[22px] border border-border/80 bg-card/90 p-4 text-left shadow-[var(--shadow-card)]"><Route className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Routes</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Track walk or run distance.</p></button>
       </SectionCard>
