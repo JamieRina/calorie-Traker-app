@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bike, Calculator, Clock3, Dumbbell, Footprints, HeartPulse, MapPinned, Plus, Route, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
@@ -105,8 +105,31 @@ function detailFromNotes(notes?: string) {
   return [intensity, steps ? `${steps} steps` : null].filter(Boolean).join(" • ");
 }
 
+
+type TrackerPoint = { latitude: number; longitude: number; accuracy: number; timestamp: number };
+
+function distanceBetweenPointsKm(from: TrackerPoint, to: TrackerPoint) {
+  const earthRadiusKm = 6371;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latDelta = toRadians(to.latitude - from.latitude);
+  const lonDelta = toRadians(to.longitude - from.longitude);
+  const startLat = toRadians(from.latitude);
+  const endLat = toRadians(to.latitude);
+  const a = Math.sin(latDelta / 2) ** 2 + Math.cos(startLat) * Math.cos(endLat) * Math.sin(lonDelta / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDuration(totalSeconds: number) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
+    : `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export default function Activity() {
-  const { currentDate, uiMode, routeLibrary, workoutPresets, isBackendReady } = useApp();
+  const { currentDate, uiMode, workoutPresets, isBackendReady } = useApp();
   const queryClient = useQueryClient();
   const [selectedExerciseName, setSelectedExerciseName] = useState(EXERCISES[0].name);
   const [customTitle, setCustomTitle] = useState("");
@@ -115,6 +138,15 @@ export default function Activity() {
   const [steps, setSteps] = useState("");
   const [distanceKm, setDistanceKm] = useState("");
   const [activeModal, setActiveModal] = useState<"custom" | "library" | "routes" | null>(null);
+  const [isTrackingRoute, setIsTrackingRoute] = useState(false);
+  const [trackedDistanceKm, setTrackedDistanceKm] = useState(0);
+  const [trackedElapsedSeconds, setTrackedElapsedSeconds] = useState(0);
+  const [trackerPointCount, setTrackerPointCount] = useState(0);
+  const [trackerAccuracy, setTrackerAccuracy] = useState<number | null>(null);
+  const [trackerMessage, setTrackerMessage] = useState("Press start, allow location access, then keep the app open while you walk or run.");
+  const lastTrackerPointRef = useRef<TrackerPoint | null>(null);
+  const trackerWatchIdRef = useRef<number | null>(null);
+  const trackerStartedAtRef = useRef<number | null>(null);
 
   const dashboardQuery = useQuery({ queryKey: ["dashboard", currentDate], queryFn: () => getDashboard(currentDate), enabled: isBackendReady });
   const workoutsQuery = useQuery({ queryKey: ["workouts"], queryFn: listWorkouts, enabled: isBackendReady });
@@ -165,6 +197,155 @@ export default function Activity() {
     if (!exercise.supportsDistance) setDistanceKm("");
     setActiveModal("custom");
   };
+
+  const stopRouteTracking = () => {
+    if (trackerWatchIdRef.current !== null && "geolocation" in navigator) {
+      navigator.geolocation.clearWatch(trackerWatchIdRef.current);
+      trackerWatchIdRef.current = null;
+    }
+    setIsTrackingRoute(false);
+    trackerStartedAtRef.current = null;
+  };
+
+  const startRouteTracking = () => {
+    if (!("geolocation" in navigator)) {
+      setTrackerMessage("Location tracking is not available on this device or browser.");
+      toast.error("Location tracking is not available on this device.");
+      return;
+    }
+
+    setTrackedDistanceKm(0);
+    setTrackedElapsedSeconds(0);
+    setTrackerPointCount(0);
+    setTrackerAccuracy(null);
+    setTrackerMessage("Waiting for a good GPS signal...");
+    lastTrackerPointRef.current = null;
+    trackerStartedAtRef.current = Date.now();
+    setIsTrackingRoute(true);
+
+    trackerWatchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const point: TrackerPoint = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
+        };
+
+        setTrackerAccuracy(point.accuracy);
+        setTrackerPointCount((count) => count + 1);
+
+        const previousPoint = lastTrackerPointRef.current;
+        lastTrackerPointRef.current = point;
+
+        if (!previousPoint) {
+          setTrackerMessage("Tracking started. Keep the app open while you move.");
+          return;
+        }
+
+        const secondsSinceLastPoint = Math.max(1, (point.timestamp - previousPoint.timestamp) / 1000);
+        const segmentKm = distanceBetweenPointsKm(previousPoint, point);
+        const segmentSpeedKmh = segmentKm / (secondsSinceLastPoint / 3600);
+
+        if (point.accuracy > 75 || segmentKm < 0.003 || segmentSpeedKmh > 25) {
+          setTrackerMessage(point.accuracy > 75 ? "GPS signal is weak. Distance will update when accuracy improves." : "Tracking... filtering small GPS jumps.");
+          return;
+        }
+
+        setTrackedDistanceKm((distance) => distance + segmentKm);
+        setTrackerMessage("Tracking your route.");
+      },
+      (error) => {
+        setTrackerMessage(error.message || "Could not access your location.");
+        toast.error(error.message || "Could not access your location.");
+        stopRouteTracking();
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 },
+    );
+  };
+
+  useEffect(() => {
+    if (!isTrackingRoute) return;
+    const intervalId = window.setInterval(() => {
+      if (trackerStartedAtRef.current) {
+        setTrackedElapsedSeconds(Math.floor((Date.now() - trackerStartedAtRef.current) / 1000));
+      }
+    }, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [isTrackingRoute]);
+
+  useEffect(() => () => stopRouteTracking(), []);
+
+  const resetRouteTracker = () => {
+    stopRouteTracking();
+    setTrackedDistanceKm(0);
+    setTrackedElapsedSeconds(0);
+    setTrackerPointCount(0);
+    setTrackerAccuracy(null);
+    lastTrackerPointRef.current = null;
+    setTrackerMessage("Press start, allow location access, then keep the app open while you walk or run.");
+  };
+
+  const trackedDurationMinutes = Math.max(1, Math.round(trackedElapsedSeconds / 60));
+  const trackedSpeedKmh = trackedElapsedSeconds > 0 ? trackedDistanceKm / (trackedElapsedSeconds / 3600) : 0;
+  const trackedExercise = trackedSpeedKmh >= 7 ? EXERCISES.find((exercise) => exercise.name === "Running")! : EXERCISES.find((exercise) => exercise.name === "Walking")!;
+  const trackedCalories = calculateCalories({ exercise: trackedExercise, weightKg: userWeightKg, minutes: trackedDurationMinutes, intensity: "Moderate", steps: 0, distanceKm: trackedDistanceKm }).calories;
+
+  const logTrackedRoute = () => {
+    if (!isBackendReady) {
+      toast.error("Workout logging is still getting ready. Try again in a moment.");
+      return;
+    }
+    if (trackedDistanceKm < 0.01 || trackedElapsedSeconds < 10) {
+      toast.error("Track a little more distance before saving this route.");
+      return;
+    }
+    stopRouteTracking();
+    workoutMutation.mutate({
+      title: trackedSpeedKmh >= 7 ? "Tracked run" : "Tracked walk",
+      durationMinutes: trackedDurationMinutes,
+      caloriesBurned: trackedCalories,
+      notes: `Distance: ${trackedDistanceKm.toFixed(2)} km | Speed: ${trackedSpeedKmh.toFixed(1)} km/h | GPS route tracker | Points: ${trackerPointCount}`,
+    });
+  };
+
+  const routeTracker = (
+    <div className="space-y-4">
+      <div className="rounded-[28px] border border-primary/15 bg-primary/10 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground"><MapPinned className="h-5 w-5" /></div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Live route tracker</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Uses your phone location to estimate how far you have walked or ran.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-[24px] bg-surface-elevated/45 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Distance</p><p className="display-font mt-1 text-3xl font-bold text-foreground">{trackedDistanceKm.toFixed(2)}</p><p className="text-xs text-muted-foreground">km</p></div>
+        <div className="rounded-[24px] bg-surface-elevated/45 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Time</p><p className="display-font mt-1 text-3xl font-bold text-foreground">{formatDuration(trackedElapsedSeconds)}</p><p className="text-xs text-muted-foreground">moving timer</p></div>
+        <div className="rounded-[24px] bg-surface-elevated/45 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Pace</p><p className="display-font mt-1 text-3xl font-bold text-foreground">{trackedSpeedKmh > 0 ? trackedSpeedKmh.toFixed(1) : "--"}</p><p className="text-xs text-muted-foreground">km/h</p></div>
+        <div className="rounded-[24px] bg-surface-elevated/45 p-4"><p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/65">Burn</p><p className="display-font mt-1 text-3xl font-bold text-foreground">{trackedDistanceKm > 0 ? trackedCalories : 0}</p><p className="text-xs text-muted-foreground">estimated kcal</p></div>
+      </div>
+
+      <div className="rounded-[24px] border border-border/80 bg-card/90 p-4">
+        <p className="text-sm font-semibold text-foreground">{isTrackingRoute ? "Tracking is active" : "Tracking is stopped"}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{trackerMessage}</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full bg-secondary px-3 py-1.5">GPS points: {trackerPointCount}</span>
+          <span className="rounded-full bg-secondary px-3 py-1.5">Accuracy: {trackerAccuracy ? `±${Math.round(trackerAccuracy)}m` : "waiting"}</span>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {isTrackingRoute ? <button onClick={stopRouteTracking} className="rounded-2xl bg-foreground px-4 py-3 text-sm font-bold text-background">Stop</button> : <button onClick={startRouteTracking} className="rounded-2xl bg-primary px-4 py-3 text-sm font-bold text-primary-foreground">Start tracking</button>}
+        <button onClick={resetRouteTracker} className="rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-foreground">Reset</button>
+        <button onClick={logTrackedRoute} disabled={workoutMutation.isPending || trackedDistanceKm < 0.01} className="rounded-2xl bg-primary/90 px-4 py-3 text-sm font-bold text-primary-foreground transition-opacity disabled:opacity-50">Save workout</button>
+      </div>
+
+      <p className="text-xs leading-5 text-muted-foreground">For best results, allow precise location, start outdoors, and keep the app open while tracking. Very weak GPS points are ignored to reduce false distance jumps.</p>
+    </div>
+  );
 
   const builder = (
     <div className="space-y-4">
@@ -225,7 +406,7 @@ export default function Activity() {
       <SectionCard eyebrow="Log activity" title="Workout tools" description="Open detailed forms only when needed." bodyClassName="grid gap-2 sm:grid-cols-3">
         <button onClick={() => setActiveModal("custom")} className="rounded-[22px] border border-primary/20 bg-primary/[0.08] p-4 text-left shadow-[var(--shadow-card)]"><Calculator className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Custom workout</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Time, distance, steps and intensity.</p></button>
         <button onClick={() => setActiveModal("library")} className="rounded-[22px] border border-border/80 bg-card/90 p-4 text-left shadow-[var(--shadow-card)]"><Dumbbell className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Exercise library</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Choose from {EXERCISES.length} exercises.</p></button>
-        <button onClick={() => setActiveModal("routes")} className="rounded-[22px] border border-border/80 bg-card/90 p-4 text-left shadow-[var(--shadow-card)]"><Route className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Routes</p><p className="mt-1 text-xs leading-5 text-muted-foreground">View saved distance ideas.</p></button>
+        <button onClick={() => setActiveModal("routes")} className="rounded-[22px] border border-border/80 bg-card/90 p-4 text-left shadow-[var(--shadow-card)]"><Route className="h-5 w-5 text-primary" /><p className="mt-3 text-sm font-bold text-foreground">Routes</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Track walk or run distance.</p></button>
       </SectionCard>
 
       <SectionCard eyebrow="Quick log" title="Presets" bodyClassName="grid gap-3 sm:grid-cols-2">
@@ -264,10 +445,8 @@ export default function Activity() {
       ) : null}
 
       {activeModal === "routes" ? (
-        <Modal eyebrow="Advanced" title="Routes" onClose={() => setActiveModal(null)}>
-          <div className="space-y-3">{routeLibrary.map((route) => (
-            <article key={route.id} className="flex items-start gap-3 rounded-[24px] border border-border/80 bg-surface-elevated/35 p-4"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary"><MapPinned className="h-4 w-4" /></div><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-foreground">{route.name}</p><p className="mt-1 text-sm text-muted-foreground">{route.location}</p></div><div className="rounded-2xl border border-border/70 bg-card/80 px-3 py-2 text-right text-sm font-semibold text-foreground"><p>{route.distanceKm.toFixed(1)} km</p><p className="mt-1 text-xs text-muted-foreground">{route.estimatedBurn} kcal</p></div></article>
-          ))}</div>
+        <Modal eyebrow="GPS tracker" title="Routes" onClose={() => setActiveModal(null)}>
+          {routeTracker}
         </Modal>
       ) : null}
     </AppPage>
