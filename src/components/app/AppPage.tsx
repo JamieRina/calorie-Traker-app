@@ -36,7 +36,7 @@ interface MetricCardProps {
 export function AppPage({ children }: AppPageProps) {
   return (
     <div className="relative flex h-full flex-col overflow-y-auto pb-28 no-scrollbar">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_34%),radial-gradient(circle_at_top_right,hsl(var(--hydration)/0.1),transparent_42%)]" />
+      
       <div className="relative flex flex-col gap-3.5 px-4 pb-6 pt-5 safe-top sm:px-5">{children}</div>
     </div>
   );
@@ -72,7 +72,7 @@ export function SectionCard({
         variant === "default" && "app-card",
         variant === "soft" && "app-card-soft",
         variant === "hero" &&
-          "border-primary/20 bg-[linear-gradient(145deg,hsl(var(--primary)/0.16),hsl(var(--hydration)/0.08),hsl(var(--card)/0.94)_58%,hsl(var(--surface-success)/0.4))] backdrop-blur-xl",
+          "border border-slate-800 bg-[#0f172a]",
         className,
       )}
     >
@@ -114,8 +114,7 @@ export function MetricCard({ icon: Icon, label, value, detail, tone = "default",
       )}
     >
       <div className="flex items-start gap-3">
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl", tone === "accent" ? "bg-primary text-primary-foreground shadow-[var(--shadow-button)]" : "bg-primary/15 text-primary")}>
-          <Icon className="h-4 w-4" />
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl", tone === "accent" ? "bg-primary text-primary-foreground shadow-[var(--shadow-button)]" : "bg-[#0f172a] text-primary")}>
         </div>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary/60">{label}</p>

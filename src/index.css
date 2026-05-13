@@ -55,9 +55,7 @@
     --shadow-card: 0 24px 52px -38px rgb(15 23 42 / 0.18);
     --shadow-button: 0 20px 36px -24px rgb(16 185 129 / 0.48);
     --app-background:
-      radial-gradient(circle at top left, rgb(16 185 129 / 0.14), transparent 24%),
-      radial-gradient(circle at top right, rgb(56 189 248 / 0.12), transparent 30%),
-      linear-gradient(180deg, hsl(var(--background-secondary)), hsl(var(--background)) 52%, hsl(210 40% 96%));
+      background: #020817;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 222 47% 11%;
@@ -117,10 +115,7 @@
     --shadow-card: 0 28px 58px -36px rgb(0 0 0 / 0.62);
     --shadow-button: 0 22px 38px -24px rgb(16 185 129 / 0.72);
     --app-background:
-      radial-gradient(circle at top left, rgb(16 185 129 / 0.16), transparent 26%),
-      radial-gradient(circle at top right, rgb(59 130 246 / 0.12), transparent 32%),
-      radial-gradient(circle at bottom center, rgb(139 92 246 / 0.08), transparent 36%),
-      linear-gradient(180deg, hsl(var(--background)), hsl(var(--background-secondary)) 50%, hsl(222 84% 4%));
+      background: #020817;
   }
 }
 

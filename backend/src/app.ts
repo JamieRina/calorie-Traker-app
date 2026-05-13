@@ -78,7 +78,7 @@ app.get("/", (_request, response) => {
           body {
             margin: 0;
             font-family: Arial, sans-serif;
-            background: linear-gradient(180deg, #fff8f2, #f4fbfb);
+            background: background: #020817
             color: #1f2937;
           }
           main {

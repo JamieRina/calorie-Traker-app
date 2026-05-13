@@ -49,8 +49,6 @@ const App = () => (
           <BrowserRouter>
             <div className="flex h-full items-center justify-center bg-transparent px-3 py-3 sm:px-6 sm:py-6">
               <div className="relative h-full w-full max-w-[430px] overflow-hidden rounded-[30px] border border-border/80 bg-background shadow-[0_42px_90px_-48px_rgb(0_0_0/0.62)] sm:h-[min(920px,100%)]">
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.14),transparent_28%),radial-gradient(circle_at_top_right,hsl(var(--hydration)/0.12),transparent_34%),linear-gradient(180deg,hsl(var(--surface-elevated)/0.18),transparent_28%,hsl(var(--background-secondary)/0.28))]" />
-                <AppRoutes />
               </div>
             </div>
           </BrowserRouter>

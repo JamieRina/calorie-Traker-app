@@ -117,8 +117,6 @@ export default function Auth() {
 
   return (
     <div className="relative flex h-full flex-col overflow-y-auto px-5 pb-7 pt-7 no-scrollbar safe-top">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.18),transparent_34%),radial-gradient(circle_at_top_right,hsl(var(--hydration)/0.14),transparent_42%)]" />
-      <div className="relative flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <AppLogo />
           <div className="flex items-center gap-2 rounded-2xl border border-border/80 bg-card/90 px-3 py-2 text-xs font-semibold text-primary shadow-[var(--shadow-card)]">
